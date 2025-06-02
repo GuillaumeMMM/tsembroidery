@@ -2,7 +2,7 @@ export class PyFile {
   private offset: number = 0;
   private data: number[];
 
-  constructor(data: []) {
+  constructor(data: number[]) {
     this.data = data;
   }
 
