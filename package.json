@@ -1,6 +1,6 @@
 {
   "name": "@guillaumemmm/tsembroidery",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "description": "Typescript function for converting embroidery file formats.",
   "type": "module",
   "files": [
