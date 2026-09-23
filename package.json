@@ -3,26 +3,23 @@
   "version": "2.0.0",
   "description": "Read Brother .pes embroidery files and render them as SVG.",
   "type": "module",
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js"
     }
   },
-  "sideEffects": false,
   "files": [
-    "/dist",
-    "/scripts"
+    "/dist"
   ],
   "scripts": {
     "build": "tsup && tsc -p tsconfig.json --emitDeclarationOnly",
-    "test": "tsup && tsc -p tsconfig.json --emitDeclarationOnly && node --test tests/*.test.ts && tsc -p tsconfig.check.json",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.check.json",
-    "tosvg": "node scripts/pes2svg.mjs"
+    "prepublishOnly": "npm run build"
   },
   "author": "guillaumemmm",
   "repository": {
@@ -31,9 +28,9 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@opencode/cli": "2.0.14",
-    "@types/node": "26.6.2",
+    "@opencode/cli": "^2.0.15",
     "tsup": "8.5.1",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
   }
 }

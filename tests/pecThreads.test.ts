@@ -1,42 +1,41 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
-import { getThreadSet } from "../dist/index.js";
+import { test, expect } from "vitest";
+import { getThreadSet } from "../src/index.ts";
 
 test("PEC chart has 65 entries (indices 0-64)", () => {
   const set = getThreadSet();
-  assert.equal(set.length, 65);
+  expect(set.length).toBe(65);
 });
 
 test("PEC chart spot checks (pinned to EmbThreadPec.py)", () => {
   const set = getThreadSet();
   const at = (i: number) => set[i];
 
-  assert.equal(at(0).description, "Unknown");
-  assert.equal(at(0).catalog_number, "0");
-  assert.equal(at(0).hexColor(), "#000000");
+  expect(at(0).description).toBe("Unknown");
+  expect(at(0).catalog_number).toBe("0");
+  expect(at(0).hexColor()).toBe("#000000");
 
-  assert.equal(at(5).description, "Red");
-  assert.equal(at(5).catalog_number, "5");
-  assert.equal(at(5).hexColor(), "#ed171f"); // 237,23,31
+  expect(at(5).description).toBe("Red");
+  expect(at(5).catalog_number).toBe("5");
+  expect(at(5).hexColor()).toBe("#ed171f"); // 237,23,31
 
-  assert.equal(at(13).description, "Yellow");
-  assert.equal(at(13).hexColor(), "#ffff00"); // 255,255,0
+  expect(at(13).description).toBe("Yellow");
+  expect(at(13).hexColor()).toBe("#ffff00"); // 255,255,0
 
-  assert.equal(at(20).description, "Black");
-  assert.equal(at(20).hexColor(), "#000000");
+  expect(at(20).description).toBe("Black");
+  expect(at(20).hexColor()).toBe("#000000");
 
-  assert.equal(at(29).description, "White");
-  assert.equal(at(29).hexColor(), "#f0f0f0"); // 240,240,240
+  expect(at(29).description).toBe("White");
+  expect(at(29).hexColor()).toBe("#f0f0f0"); // 240,240,240
 
-  assert.equal(at(64).description, "Applique");
-  assert.equal(at(64).catalog_number, "64");
-  assert.equal(at(64).hexColor(), "#ffc8c8"); // 255,200,200
+  expect(at(64).description).toBe("Applique");
+  expect(at(64).catalog_number).toBe("64");
+  expect(at(64).hexColor()).toBe("#ffc8c8"); // 255,200,200
 });
 
 test("PEC chart entries carry Brother brand/chart", () => {
   const set = getThreadSet();
   for (const thread of set) {
-    assert.equal(thread.brand, "Brother");
-    assert.equal(thread.chart, "Brother");
+    expect(thread.brand).toBe("Brother");
+    expect(thread.chart).toBe("Brother");
   }
 });

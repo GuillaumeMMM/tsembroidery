@@ -1,7 +1,6 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
-import { EmbConstant as C, EmbPattern, EmbThread } from "../dist/index.js";
-import type { Stitch } from "../dist/index.js";
+import { test, expect } from "vitest";
+import { EmbConstant as C, EmbPattern, EmbThread } from "../src/index.ts";
+import type { Stitch } from "../src/index.ts";
 
 function thread(r: number, g: number, b: number): EmbThread {
   const t = new EmbThread();
@@ -13,19 +12,19 @@ test("addStitchRelative accumulates against the cursor", () => {
   const p = new EmbPattern();
   p.stitch(10, 10);
   p.stitch(5, -5);
-  assert.deepEqual(p.stitches, [
+  expect(p.stitches).toStrictEqual([
     [10, 10, C.STITCH],
     [15, 5, C.STITCH],
   ]);
-  assert.equal(p._previousX, 15);
-  assert.equal(p._previousY, 5);
+  expect(p._previousX).toBe(15);
+  expect(p._previousY).toBe(5);
 });
 
 test("addStitchAbsolute sets the cursor", () => {
   const p = new EmbPattern();
   p.stitchAbs(100, 200);
   p.stitch(1, 1);
-  assert.deepEqual(p.stitches[1], [101, 201, C.STITCH]);
+  expect(p.stitches[1]).toStrictEqual([101, 201, C.STITCH]);
 });
 
 test("addCommand does NOT move the cursor", () => {
@@ -34,8 +33,8 @@ test("addCommand does NOT move the cursor", () => {
   p.addCommand(C.SEQUENCE_BREAK, 999, 999);
   p.stitch(5, 5);
   // cursor still at (10, 20) after the positionless command
-  assert.deepEqual(p.stitches[2], [15, 25, C.STITCH]);
-  assert.deepEqual(p.stitches[1], [999, 999, C.SEQUENCE_BREAK]);
+  expect(p.stitches[2]).toStrictEqual([15, 25, C.STITCH]);
+  expect(p.stitches[1]).toStrictEqual([999, 999, C.SEQUENCE_BREAK]);
 });
 
 test("shorthand builders map to their commands", () => {
@@ -48,7 +47,7 @@ test("shorthand builders map to their commands", () => {
   p.sequinEject();
   p.sequinMode();
   const commands = p.stitches.map((s) => s[2]);
-  assert.deepEqual(commands, [
+  expect(commands).toStrictEqual([
     C.JUMP,
     C.TRIM,
     C.COLOR_CHANGE,
@@ -64,12 +63,12 @@ test("extents computes bounds over all stitches", () => {
   p.stitchAbs(-10, 4);
   p.stitchAbs(30, -7);
   p.stitchAbs(5, 22);
-  assert.deepEqual(p.extents(), { minX: -10, minY: -7, maxX: 30, maxY: 22 });
+  expect(p.extents()).toStrictEqual({ minX: -10, minY: -7, maxX: 30, maxY: 22 });
 });
 
 test("extents on empty pattern is +/-Infinity (python behavior)", () => {
   const p = new EmbPattern();
-  assert.deepEqual(p.extents(), {
+  expect(p.extents()).toStrictEqual({
     minX: Infinity,
     minY: Infinity,
     maxX: -Infinity,
@@ -83,10 +82,10 @@ test("count helpers", () => {
   p.stitch();
   p.colorChange();
   p.move();
-  assert.equal(p.countStitches(), 4);
-  assert.equal(p.countColorChanges(), 1);
-  assert.equal(p.countStitchCommands(C.STITCH), 2);
-  assert.equal(p.countStitchCommands(C.JUMP), 1);
+  expect(p.countStitches()).toBe(4);
+  expect(p.countColorChanges()).toBe(1);
+  expect(p.countStitchCommands(C.STITCH)).toBe(2);
+  expect(p.countStitchCommands(C.JUMP)).toBe(1);
 });
 
 /* ------------------------------ addThread ----------------------------- */
@@ -95,38 +94,38 @@ test("addThread with an EmbThread instance", () => {
   const p = new EmbPattern();
   const t = thread(1, 2, 3);
   p.addThread(t);
-  assert.equal(p.threadlist.length, 1);
-  assert.equal(p.threadlist[0], t); // same instance, identity preserved
+  expect(p.threadlist.length).toBe(1);
+  expect(p.threadlist[0]).toBe(t); // same instance, identity preserved
 });
 
 test("addThread with a packed color number", () => {
   const p = new EmbPattern();
   p.addThread(0x123456);
-  assert.equal(p.threadlist[0].color, 0x123456);
+  expect(p.threadlist[0].color).toBe(0x123456);
 });
 
 test("addThread with an object spec", () => {
   const p = new EmbPattern();
   p.addThread({ name: "n", brand: "b", hex: "#112233", id: "7" });
   const t = p.threadlist[0];
-  assert.equal(t.description, "n");
-  assert.equal(t.brand, "b");
-  assert.equal(t.color, 0x112233);
-  assert.equal(t.catalog_number, "7");
+  expect(t.description).toBe("n");
+  expect(t.brand).toBe("b");
+  expect(t.color).toBe(0x112233);
+  expect(t.catalog_number).toBe("7");
 });
 
 test("addThread object spec: desc/manufacturer/rgb tuple variants", () => {
   const p = new EmbPattern();
   p.addThread({ desc: "d", manufacturer: "m", rgb: [1, 2, 3] });
-  assert.equal(p.threadlist[0].description, "d");
-  assert.equal(p.threadlist[0].brand, "m");
-  assert.equal(p.threadlist[0].color, 0x010203);
+  expect(p.threadlist[0].description).toBe("d");
+  expect(p.threadlist[0].brand).toBe("m");
+  expect(p.threadlist[0].color).toBe(0x010203);
 });
 
 test("addThread object spec: color string '#rrggbb'", () => {
   const p = new EmbPattern();
   p.addThread({ color: "#aabbcc" });
-  assert.equal(p.threadlist[0].color, 0xaabbcc);
+  expect(p.threadlist[0].color).toBe(0xaabbcc);
 });
 
 /* ------------------------------- metadata ----------------------------- */
@@ -134,9 +133,9 @@ test("addThread object spec: color string '#rrggbb'", () => {
 test("metadata round-trip with getMetadata default", () => {
   const p = new EmbPattern();
   p.metadata("name", "Flowers");
-  assert.equal(p.getMetadata("name"), "Flowers");
-  assert.equal(p.getMetadata("missing", "fallback"), "fallback");
-  assert.equal(p.getMetadata("missing"), undefined);
+  expect(p.getMetadata("name")).toBe("Flowers");
+  expect(p.getMetadata("missing", "fallback")).toBe("fallback");
+  expect(p.getMetadata("missing")).toBe(undefined);
 });
 
 /* --------------------------- filler threads --------------------------- */
@@ -145,16 +144,16 @@ test("getThreadOrFiller returns stored thread when present", () => {
   const p = new EmbPattern();
   const t = thread(9, 9, 9);
   p.addThread(t);
-  assert.equal(p.getThreadOrFiller(0), t);
+  expect(p.getThreadOrFiller(0)).toBe(t);
 });
 
 test("filler thread is deterministic black but a FRESH instance each call", () => {
   const p = new EmbPattern();
   const a = p.getThreadOrFiller(0);
   const b = p.getThreadOrFiller(0);
-  assert.equal(a.hexColor(), "#000000");
-  assert.equal(b.hexColor(), "#000000");
-  assert.notEqual(a, b); // identity must differ, like python's random filler
+  expect(a.hexColor()).toBe("#000000");
+  expect(b.hexColor()).toBe("#000000");
+  expect(a).not.toBe(b); // identity must differ, like python's random filler
 });
 
 /* ---------------------------- block iterators ------------------------- */
@@ -176,22 +175,22 @@ function patternWithColors(): EmbPattern {
 test("getAsStitchblock splits runs on non-stitch commands and swaps thread", () => {
   const p = patternWithColors();
   const blocks = [...p.getAsStitchblock()];
-  assert.equal(blocks.length, 3);
+  expect(blocks.length).toBe(3);
   // first block: 2 stitches, thread 0 (red)
-  assert.equal(blocks[0][0].length, 2);
-  assert.equal(blocks[0][1].hexColor(), "#ff0000");
+  expect(blocks[0][0].length).toBe(2);
+  expect(blocks[0][1].hexColor()).toBe("#ff0000");
   // second block: 1 stitch after color change -> thread 1 (green)
-  assert.equal(blocks[1][0].length, 1);
-  assert.equal(blocks[1][1].hexColor(), "#00ff00");
+  expect(blocks[1][0].length).toBe(1);
+  expect(blocks[1][1].hexColor()).toBe("#00ff00");
   // third block: 1 stitch after trim -> same thread 1 (threadIndex advanced
   // only on COLOR_CHANGE)
-  assert.equal(blocks[2][0].length, 1);
-  assert.equal(blocks[2][1].hexColor(), "#00ff00");
+  expect(blocks[2][0].length).toBe(1);
+  expect(blocks[2][1].hexColor()).toBe("#00ff00");
 });
 
 test("getAsStitchblock on empty pattern yields nothing", () => {
   const p = new EmbPattern();
-  assert.deepEqual([...p.getAsStitchblock()], []);
+  expect([...p.getAsStitchblock()]).toStrictEqual([]);
 });
 
 test("getAsCommandBlocks groups by command transitions", () => {
@@ -199,23 +198,23 @@ test("getAsCommandBlocks groups by command transitions", () => {
   const blocks = [...p.getAsCommandBlocks()];
   // commands: STITCH STITCH COLOR_CHANGE STITCH TRIM STITCH
   // -> groups: [s,s], [cc], [s], [trim], [s]
-  assert.equal(blocks.length, 5);
-  assert.equal(blocks[0].length, 2);
-  assert.equal(blocks[1].length, 1);
-  assert.equal(blocks[1][0][2], C.COLOR_CHANGE);
+  expect(blocks.length).toBe(5);
+  expect(blocks[0].length).toBe(2);
+  expect(blocks[1].length).toBe(1);
+  expect(blocks[1][0][2]).toBe(C.COLOR_CHANGE);
 });
 
 test("getAsColorblocks splits at COLOR_CHANGE with threads", () => {
   const p = patternWithColors();
   const blocks = [...p.getAsColorblocks()];
-  assert.equal(blocks.length, 2);
+  expect(blocks.length).toBe(2);
   // python yields slices BETWEEN color changes: block 0 excludes the
   // COLOR_CHANGE command itself (2 stitches), block 1 starts AT it (4).
-  assert.equal(blocks[0][0].length, 2);
-  assert.equal(blocks[0][1].hexColor(), "#ff0000");
-  assert.equal(blocks[1][0].length, 4);
-  assert.equal(blocks[1][0][0][2], C.COLOR_CHANGE);
-  assert.equal(blocks[1][1].hexColor(), "#00ff00");
+  expect(blocks[0][0].length).toBe(2);
+  expect(blocks[0][1].hexColor()).toBe("#ff0000");
+  expect(blocks[1][0].length).toBe(4);
+  expect(blocks[1][0][0][2]).toBe(C.COLOR_CHANGE);
+  expect(blocks[1][1].hexColor()).toBe("#00ff00");
 });
 
 /* ---------------------------- conversions ----------------------------- */
@@ -224,10 +223,10 @@ test("convertDuplicateColorChangeToStop: different thread keeps COLOR_CHANGE", (
   const p = patternWithColors();
   p.convertDuplicateColorChangeToStop();
   const commands = p.stitches.map((s) => s[2]);
-  assert.ok(commands.includes(C.COLOR_CHANGE));
-  assert.ok(!commands.includes(C.STOP));
+  expect(commands.includes(C.COLOR_CHANGE)).toBeTruthy();
+  expect(!commands.includes(C.STOP)).toBeTruthy();
   // both threads preserved
-  assert.equal(p.threadlist.length, 2);
+  expect(p.threadlist.length).toBe(2);
 });
 
 test("convertDuplicateColorChangeToStop: duplicate thread becomes STOP", () => {
@@ -240,8 +239,8 @@ test("convertDuplicateColorChangeToStop: duplicate thread becomes STOP", () => {
   p.stitch(5, 5);
   p.convertDuplicateColorChangeToStop();
   const commands = p.stitches.map((s) => s[2]);
-  assert.ok(commands.includes(C.STOP));
-  assert.ok(!commands.includes(C.COLOR_CHANGE));
+  expect(commands.includes(C.STOP)).toBeTruthy();
+  expect(!commands.includes(C.COLOR_CHANGE)).toBeTruthy();
 });
 
 test("convertStopToColorChange adds threads", () => {
@@ -252,9 +251,9 @@ test("convertStopToColorChange adds threads", () => {
   p.stitch(5, 5);
   p.convertStopToColorChange();
   const commands = p.stitches.map((s) => s[2]);
-  assert.ok(commands.includes(C.COLOR_CHANGE));
-  assert.ok(!commands.includes(C.STOP));
-  assert.equal(p.threadlist.length, 2);
+  expect(commands.includes(C.COLOR_CHANGE)).toBeTruthy();
+  expect(!commands.includes(C.STOP)).toBeTruthy();
+  expect(p.threadlist.length).toBe(2);
 });
 
 test("convertJumpsToTrim: jump run of >= 3 gets a TRIM, one merged JUMP left", () => {
@@ -268,7 +267,7 @@ test("convertJumpsToTrim: jump run of >= 3 gets a TRIM, one merged JUMP left", (
   const commands = p.stitches.map((s) => s[2]);
   // python keeps the LAST jump of the merged run (it re-adds
   // stitches[i] after the trim), so: STITCH TRIM JUMP STITCH
-  assert.deepEqual(commands, [C.STITCH, C.TRIM, C.JUMP, C.STITCH]);
+  expect(commands).toStrictEqual([C.STITCH, C.TRIM, C.JUMP, C.STITCH]);
 });
 
 test("convertJumpsToTrim: short jump run is kept as one jump", () => {
@@ -279,7 +278,7 @@ test("convertJumpsToTrim: short jump run is kept as one jump", () => {
   p.stitch(1, 0);
   p.convertJumpsToTrim(3);
   const jumps = p.stitches.filter((s) => s[2] === C.JUMP);
-  assert.equal(jumps.length, 1); // merged run of 2 -> single final jump kept
+  expect(jumps.length).toBe(1); // merged run of 2 -> single final jump kept
 });
 
 /* ------------------------------ transforms ---------------------------- */
@@ -289,8 +288,8 @@ test("translate moves every stitch", () => {
   p.stitchAbs(0, 0);
   p.stitch(5, 5);
   p.translate(10, -3);
-  assert.deepEqual(p.stitches[0], [10, -3, C.STITCH]);
-  assert.deepEqual(p.stitches[1], [15, 2, C.STITCH]);
+  expect(p.stitches[0]).toStrictEqual([10, -3, C.STITCH]);
+  expect(p.stitches[1]).toStrictEqual([15, 2, C.STITCH]);
 });
 
 test("moveCenterToOrigin centers extents on (0,0) with python rounding", () => {
@@ -298,7 +297,7 @@ test("moveCenterToOrigin centers extents on (0,0) with python rounding", () => {
   p.stitchAbs(0, 0);
   p.stitchAbs(10, 10);
   p.moveCenterToOrigin();
-  assert.deepEqual(p.extents(), { minX: -5, minY: -5, maxX: 5, maxY: 5 });
+  expect(p.extents()).toStrictEqual({ minX: -5, minY: -5, maxX: 5, maxY: 5 });
 });
 
 test("getSingletonThreadlist keeps only changed threads", () => {
@@ -308,8 +307,8 @@ test("getSingletonThreadlist keeps only changed threads", () => {
   p.addThread(a);
   p.addThread(a);
   p.addThread(b);
-  assert.deepEqual(p.getSingletonThreadlist(), [a, b]);
-  assert.equal(p.getUniqueThreadlist().length, 2);
+  expect(p.getSingletonThreadlist()).toStrictEqual([a, b]);
+  expect(p.getUniqueThreadlist().length).toBe(2);
 });
 
 /* ------------------------------ stitchblocks -------------------------- */
@@ -322,10 +321,10 @@ test("addStitchblock emits COLOR_BREAK for a new thread", () => {
     [10, 0, C.STITCH],
   ];
   p.addStitchblock([block, t]);
-  assert.equal(p.stitches[0][2], C.COLOR_BREAK);
-  assert.equal(p.stitches[1][2], C.STITCH);
-  assert.equal(p.stitches[2][0], 10);
-  assert.equal(p.threadlist[0], t);
+  expect(p.stitches[0][2]).toBe(C.COLOR_BREAK);
+  expect(p.stitches[1][2]).toBe(C.STITCH);
+  expect(p.stitches[2][0]).toBe(10);
+  expect(p.threadlist[0]).toBe(t);
 });
 
 test("addStitchblock emits SEQUENCE_BREAK for the same thread", () => {
@@ -334,11 +333,11 @@ test("addStitchblock emits SEQUENCE_BREAK for the same thread", () => {
   const block: Stitch[] = [[0, 0, C.STITCH]];
   p.addStitchblock([block, t]);
   p.addStitchblock([[[1, 1, C.STITCH]], t]); // same instance
-  assert.equal(p.stitches[0][2], C.COLOR_BREAK);
+  expect(p.stitches[0][2]).toBe(C.COLOR_BREAK);
   const secondBlockStart = p.stitches.findIndex(
     (s, i) => i > 0 && s[2] === C.SEQUENCE_BREAK
   );
-  assert.ok(secondBlockStart > 0);
+  expect(secondBlockStart > 0).toBeTruthy();
 });
 
 test("getStablePattern strips jumps/trims into breaks", () => {
@@ -351,10 +350,10 @@ test("getStablePattern strips jumps/trims into breaks", () => {
   p.stitch(2, 2);
   const stable = p.getStablePattern();
   const commands = stable.stitches.map((s) => s[2]);
-  assert.ok(!commands.includes(C.JUMP));
-  assert.ok(!commands.includes(C.TRIM));
-  assert.equal(commands[0], C.COLOR_BREAK);
-  assert.equal(commands.filter((c) => c === C.STITCH).length, 3);
+  expect(!commands.includes(C.JUMP)).toBeTruthy();
+  expect(!commands.includes(C.TRIM)).toBeTruthy();
+  expect(commands[0]).toBe(C.COLOR_BREAK);
+  expect(commands.filter((c) => c === C.STITCH).length).toBe(3);
 });
 
 test("getPatternMergeJumps replaces jump runs with STITCH_BREAK", () => {
@@ -365,8 +364,8 @@ test("getPatternMergeJumps replaces jump runs with STITCH_BREAK", () => {
   p.stitch(1, 0);
   const merged = p.getPatternMergeJumps();
   const commands = merged.stitches.map((s) => s[2]);
-  assert.equal(commands.filter((c) => c === C.STITCH_BREAK).length, 1);
-  assert.ok(!commands.includes(C.JUMP));
+  expect(commands.filter((c) => c === C.STITCH_BREAK).length).toBe(1);
+  expect(!commands.includes(C.JUMP)).toBeTruthy();
 });
 
 test("fixColorCount pads threadlist to cover all color blocks", () => {
@@ -378,10 +377,10 @@ test("fixColorCount pads threadlist to cover all color blocks", () => {
   p.stitch(1, 1);
   p.fixColorCount();
   // 3 stitch blocks opened by 2 color changes -> 3 threads
-  assert.equal(p.threadlist.length, 3);
+  expect(p.threadlist.length).toBe(3);
   // idempotent
   p.fixColorCount();
-  assert.equal(p.threadlist.length, 3);
+  expect(p.threadlist.length).toBe(3);
 });
 
 /* ---------------------------- encoder options ------------------------- */
@@ -395,7 +394,7 @@ test("append helpers add option/matrix commands at the cursor", () => {
   p.appendDisableTieOn();
   p.appendDisableTieOff();
   const commands = p.stitches.map((s) => s[2]);
-  assert.deepEqual(commands.slice(1), [
+  expect(commands.slice(1)).toStrictEqual([
     C.MATRIX_TRANSLATE,
     C.OPTION_ENABLE_TIE_ON,
     C.OPTION_ENABLE_TIE_OFF,
@@ -403,5 +402,5 @@ test("append helpers add option/matrix commands at the cursor", () => {
     C.OPTION_DISABLE_TIE_OFF,
   ]);
   // MATRIX_TRANSLATE carried its x/y relative to the cursor (0,0)
-  assert.deepEqual(p.stitches[1], [5, 6, C.MATRIX_TRANSLATE]);
+  expect(p.stitches[1]).toStrictEqual([5, 6, C.MATRIX_TRANSLATE]);
 });

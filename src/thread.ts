@@ -15,7 +15,7 @@ function colorDistanceRedMean(
   b1: number,
   r2: number,
   g2: number,
-  b2: number
+  b2: number,
 ): number {
   // python: red_mean = int(round((r1 + r2) / 2))
   const redMean = pyRound((r1 + r2) / 2);
@@ -38,7 +38,7 @@ function colorDistanceRedMean(
  */
 export function findNearestColorIndex(
   findColor: ColorSource,
-  values: (EmbThread | null)[]
+  values: (EmbThread | null)[],
 ): number {
   const color = findColor instanceof EmbThread ? findColor.color : findColor;
   const red = (color >> 16) & 0xff;
@@ -56,7 +56,7 @@ export function findNearestColorIndex(
       blue,
       t.getRed(),
       t.getGreen(),
-      t.getBlue()
+      t.getBlue(),
     );
     if (dist <= currentClosestValue) {
       // <= choose second if they tie.
@@ -68,7 +68,6 @@ export function findNearestColorIndex(
 }
 
 export class EmbThread {
-  /** 24-bit color, optionally with the 0xFF000000 alpha byte set. */
   color: number = 0xff000000 >>> 0;
   description: string | null = null;
   catalog_number: string | null = null;
@@ -76,7 +75,6 @@ export class EmbThread {
   brand: string | null = null;
   chart: string | null = null;
   weight: string | null = null;
-  // description, catalog_number, details, brand, chart, weight
 
   setColor(r: number, g: number, b: number): void {
     this.color =
@@ -131,7 +129,7 @@ export class EmbThread {
       const digits = h.substring(0, 3);
       const value = parseInt(
         digits[0] + digits[0] + digits[1] + digits[1] + digits[2] + digits[2],
-        16
+        16,
       );
       if (Number.isNaN(value)) {
         throw new Error(`setHexColor: invalid hex string "${hexString}"`);

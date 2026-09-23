@@ -1,5 +1,4 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "vitest";
 import {
   getIdentity,
   getScale,
@@ -11,24 +10,24 @@ import {
   distanceSquared,
   towards,
   oriented,
-} from "../dist/index.js";
+} from "../src/index.ts";
 
 const closeTo = (a: number, b: number, eps = 1e-9) =>
-  assert.ok(Math.abs(a - b) < eps, `expected ${a} ≈ ${b}`);
+  expect(Math.abs(a - b) < eps, `expected ${a} ≈ ${b}`).toBeTruthy();
 
 test("getIdentity leaves points unchanged", () => {
   const p = pointInMatrixSpace(getIdentity(), [3, 4, 0] as any);
-  assert.deepEqual(p, [3, 4, 0]);
+  expect(p).toStrictEqual([3, 4, 0]);
 });
 
 test("getTranslate shifts points", () => {
   const m = getTranslate(10, -5);
-  assert.deepEqual(pointInMatrixSpace(m, 1, 2), [11, -3]);
+  expect(pointInMatrixSpace(m, 1, 2)).toStrictEqual([11, -3]);
 });
 
 test("getScale scales points (uniform and per-axis)", () => {
-  assert.deepEqual(pointInMatrixSpace(getScale(2), 3, 4), [6, 8]);
-  assert.deepEqual(pointInMatrixSpace(getScale(2, 3), 3, 4), [6, 12]);
+  expect(pointInMatrixSpace(getScale(2), 3, 4)).toStrictEqual([6, 8]);
+  expect(pointInMatrixSpace(getScale(2, 3), 3, 4)).toStrictEqual([6, 12]);
 });
 
 test("getRotate 90 degrees rotates CCW in matrix sense", () => {
@@ -52,43 +51,43 @@ test("matrixMultiply: python settings order (translate then scale)", () => {
   let m = getIdentity();
   m = matrixMultiply(m, getTranslate(10, 10));
   m = matrixMultiply(m, getScale(2, 2));
-  assert.deepEqual(pointInMatrixSpace(m, 0, 0), [20, 20]);
+  expect(pointInMatrixSpace(m, 0, 0)).toStrictEqual([20, 20]);
 });
 
 test("matrixMultiply: identity is neutral on both sides", () => {
   const t = getTranslate(3, 4);
-  assert.deepEqual(matrixMultiply(getIdentity(), t), t);
-  assert.deepEqual(matrixMultiply(t, getIdentity()), t);
+  expect(matrixMultiply(getIdentity(), t)).toStrictEqual(t);
+  expect(matrixMultiply(t, getIdentity())).toStrictEqual(t);
 });
 
 test("pointInMatrixSpace carries a 3rd element through", () => {
   const m = matrixMultiply(getTranslate(1, 1), getRotate(0));
   const out = pointInMatrixSpace(m, [10, 20, 42] as any);
-  assert.deepEqual(out, [11, 21, 42]); // command survives transform
+  expect(out).toStrictEqual([11, 21, 42]); // command survives transform
 });
 
 test("pointInMatrixSpace on a 2-element vector returns 2 elements", () => {
   const out = pointInMatrixSpace(getTranslate(1, 1), [5, 5] as any);
-  assert.deepEqual(out, [6, 6]);
+  expect(out).toStrictEqual([6, 6]);
 });
 
 test("distance / distanceSquared", () => {
-  assert.equal(distanceSquared(0, 0, 3, 4), 25);
-  assert.equal(distance(0, 0, 3, 4), 5);
+  expect(distanceSquared(0, 0, 3, 4)).toBe(25);
+  expect(distance(0, 0, 3, 4)).toBe(5);
 });
 
 test("towards interpolates within [0,1]", () => {
-  assert.equal(towards(0, 100, 0), 0);
-  assert.equal(towards(0, 100, 1), 100);
-  assert.equal(towards(0, 100, 0.33), 33);
-  assert.equal(towards(10, 20, 0.5), 15);
+  expect(towards(0, 100, 0)).toBe(0);
+  expect(towards(0, 100, 1)).toBe(100);
+  expect(towards(0, 100, 0.33)).toBe(33);
+  expect(towards(10, 20, 0.5)).toBe(15);
 });
 
 test("oriented reaches distance r toward the target", () => {
   const [x, y] = oriented(0, 0, 10, 0, 4);
   closeTo(x, 4);
   closeTo(y, 0);
-  assert.equal(Math.round(distance(0, 0, x, y)), 4);
+  expect(Math.round(distance(0, 0, x, y))).toBe(4);
 });
 
 test("oriented from beyond target keeps direction", () => {

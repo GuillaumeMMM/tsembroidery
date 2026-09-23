@@ -113,12 +113,6 @@ export function writeSvg(pattern: EmbPattern, settings?: SvgSettings): string {
  */
 export function pesToSvg(bytes: Uint8Array, settings?: SvgSettings): string {
   let pattern = readPes(bytes, settings);
-  // python convert():
-  //   if settings is not None:
-  //       stable = settings.get("stable", True)
-  //       if stable: pattern = pattern.get_stable_pattern()
-  //   else:
-  //       pattern = pattern.get_stable_pattern()
   const stable = settings?.stable ?? true;
   if (stable) pattern = pattern.getStablePattern();
   return writeSvg(pattern, settings);

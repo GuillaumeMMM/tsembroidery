@@ -1,59 +1,58 @@
-import { test } from "node:test";
-import assert from "node:assert/strict";
-import { EmbThread, findNearestColorIndex } from "../dist/index.js";
+import { test, expect } from "vitest";
+import { EmbThread, findNearestColorIndex } from "../src/index.ts";
 
 test("setColor forces the 0xFF alpha byte", () => {
   const t = new EmbThread();
   t.setColor(0x12, 0x34, 0x56);
-  assert.equal(t.color, 0xff123456 >>> 0);
-  assert.equal(t.getOpaqueColor(), 0xff123456 >>> 0);
+  expect(t.color).toBe(0xff123456 >>> 0);
+  expect(t.getOpaqueColor()).toBe(0xff123456 >>> 0);
 });
 
 test("color getters mask to 8 bits regardless of alpha", () => {
   const t = new EmbThread();
   t.setColor(255, 128, 0);
-  assert.equal(t.getRed(), 255);
-  assert.equal(t.getGreen(), 128);
-  assert.equal(t.getBlue(), 0);
+  expect(t.getRed()).toBe(255);
+  expect(t.getGreen()).toBe(128);
+  expect(t.getBlue()).toBe(0);
 });
 
 test("hexColor includes '#' and is zero-padded", () => {
   const t = new EmbThread();
   t.setColor(0x0a, 0x0b, 0x0c);
-  assert.equal(t.hexColor(), "#0a0b0c");
+  expect(t.hexColor()).toBe("#0a0b0c");
   t.setColor(0, 0, 0);
-  assert.equal(t.hexColor(), "#000000");
+  expect(t.hexColor()).toBe("#000000");
   t.setColor(255, 255, 255);
-  assert.equal(t.hexColor(), "#ffffff");
+  expect(t.hexColor()).toBe("#ffffff");
 });
 
 test("hexColor works when color has no alpha byte", () => {
   const t = new EmbThread();
   t.color = 0x000abc; // set_hex_color stores bare 24-bit value
-  assert.equal(t.hexColor(), "#000abc");
+  expect(t.hexColor()).toBe("#000abc");
 });
 
 test("setHexColor with 6 digits", () => {
   const t = new EmbThread();
   t.setHexColor("#123456");
-  assert.equal(t.color, 0x123456);
-  assert.equal(t.hexColor(), "#123456");
+  expect(t.color).toBe(0x123456);
+  expect(t.hexColor()).toBe("#123456");
 });
 
 test("setHexColor strips leading #", () => {
   const t = new EmbThread();
   t.setHexColor("#abcdef");
-  assert.equal(t.color, 0xabcdef);
+  expect(t.color).toBe(0xabcdef);
   // multiple '#' like python lstrip('#')
   const t2 = new EmbThread();
   t2.setHexColor("##aabbcc");
-  assert.equal(t2.color, 0xaabbcc);
+  expect(t2.color).toBe(0xaabbcc);
 });
 
 test("setHexColor with 8 digits uses the first 6", () => {
   const t = new EmbThread();
   t.setHexColor("#123456ff");
-  assert.equal(t.color, 0x123456);
+  expect(t.color).toBe(0x123456);
 });
 
 test("setHexColor with 3 digits expands forward (PY-BUG fixed)", () => {
@@ -61,17 +60,17 @@ test("setHexColor with 3 digits expands forward (PY-BUG fixed)", () => {
   // semantics: "#abc" -> rgb(aa,bb,cc).
   const t = new EmbThread();
   t.setHexColor("#abc");
-  assert.equal(t.getRed(), 0xaa);
-  assert.equal(t.getGreen(), 0xbb);
-  assert.equal(t.getBlue(), 0xcc);
+  expect(t.getRed()).toBe(0xaa);
+  expect(t.getGreen()).toBe(0xbb);
+  expect(t.getBlue()).toBe(0xcc);
 });
 
 test("setHexColor with 4 digits uses the first 3 (alpha ignored)", () => {
   const t = new EmbThread();
   t.setHexColor("#abcd");
-  assert.equal(t.getRed(), 0xaa);
-  assert.equal(t.getGreen(), 0xbb);
-  assert.equal(t.getBlue(), 0xcc);
+  expect(t.getRed()).toBe(0xaa);
+  expect(t.getGreen()).toBe(0xbb);
+  expect(t.getBlue()).toBe(0xcc);
 });
 
 test("findNearestColorIndex exact match", () => {
@@ -79,15 +78,15 @@ test("findNearestColorIndex exact match", () => {
   a.setColor(255, 0, 0);
   const b = new EmbThread();
   b.setColor(0, 255, 0);
-  assert.equal(findNearestColorIndex(0xff0000, [a, b]), 0);
-  assert.equal(findNearestColorIndex(0x00ff00, [a, b]), 1);
+  expect(findNearestColorIndex(0xff0000, [a, b])).toBe(0);
+  expect(findNearestColorIndex(0x00ff00, [a, b])).toBe(1);
 });
 
 test("findNearestColorIndex skips null entries", () => {
   const a = new EmbThread();
   a.setColor(255, 0, 0);
-  assert.equal(findNearestColorIndex(0xff0000, [null, a]), 1);
-  assert.equal(findNearestColorIndex(0xff0000, [null, null]), -1);
+  expect(findNearestColorIndex(0xff0000, [null, a])).toBe(1);
+  expect(findNearestColorIndex(0xff0000, [null, null])).toBe(-1);
 });
 
 test("findNearestColorIndex tie resolves to the later index", () => {
@@ -96,7 +95,7 @@ test("findNearestColorIndex tie resolves to the later index", () => {
   a.setColor(0, 0, 0);
   const b = new EmbThread();
   b.setColor(0, 0, 0);
-  assert.equal(findNearestColorIndex(0x000000, [a, b]), 1);
+  expect(findNearestColorIndex(0x000000, [a, b])).toBe(1);
 });
 
 test("findNearestColorIndex accepts an EmbThread as target", () => {
@@ -104,7 +103,7 @@ test("findNearestColorIndex accepts an EmbThread as target", () => {
   red.setColor(255, 0, 0);
   const blue = new EmbThread();
   blue.setColor(0, 0, 255);
-  assert.equal(findNearestColorIndex(red, [blue, red]), 1);
+  expect(findNearestColorIndex(red, [blue, red])).toBe(1);
 });
 
 test("findNearestColorIndex picks perceptually nearer color (red-mean)", () => {
@@ -116,5 +115,5 @@ test("findNearestColorIndex picks perceptually nearer color (red-mean)", () => {
   // red-mean weights red: check the actual nearest to (180, 0, 0).
   const target = new EmbThread();
   target.setColor(180, 0, 0);
-  assert.equal(target.findNearestColorIndex([dark, bright]), 1);
+  expect(target.findNearestColorIndex([dark, bright])).toBe(1);
 });

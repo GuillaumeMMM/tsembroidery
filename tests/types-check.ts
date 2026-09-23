@@ -3,8 +3,8 @@
  * from a consumer's point of view: imports only go through the package
  * entry (`../dist/index.js`), exactly like an installed dependency.
  *
- * This file does not match `*.test.ts`, so `node --test` never executes
- * it — `tsc -p tsconfig.check.json` (chained into `npm test`) compiles it.
+ * This file does not match `*.test.ts`, so vitest never executes it —
+ * `tsc -p tsconfig.check.json` (`npm run typecheck`) compiles it.
  */
 import {
   ByteReader,
