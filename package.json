@@ -7,8 +7,7 @@
     "/dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc",
-    "test": "node tests/pesToSvg.js"
+    "build": "tsup ./src/index.ts"
   },
   "author": "guillaumemmm",
   "repository": {
@@ -17,6 +16,8 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "@opencode/cli": "2.0.14",
+    "tsup": "^8.5.1",
+    "typescript": "7.0.2"
   }
 }

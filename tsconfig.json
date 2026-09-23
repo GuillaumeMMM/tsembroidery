@@ -3,6 +3,7 @@
     "module": "esnext",
     "target": "es2015",
     "declaration": true,
+    "rootDir": "./src",
     "outDir": "./dist",
     "moduleResolution": "bundler"
   },
