@@ -1,13 +1,28 @@
 {
   "name": "@guillaumemmm/tsembroidery",
-  "version": "1.0.4",
-  "description": "Typescript function for converting embroidery file formats.",
+  "version": "2.0.0",
+  "description": "Read Brother .pes embroidery files and render them as SVG.",
   "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "sideEffects": false,
   "files": [
-    "/dist"
+    "/dist",
+    "/scripts"
   ],
   "scripts": {
-    "build": "tsup ./src/index.ts"
+    "build": "tsup && tsc -p tsconfig.json --emitDeclarationOnly",
+    "test": "tsup && tsc -p tsconfig.json --emitDeclarationOnly && node --test tests/*.test.ts && tsc -p tsconfig.check.json",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "tosvg": "node scripts/pes2svg.mjs"
   },
   "author": "guillaumemmm",
   "repository": {
@@ -17,7 +32,8 @@
   "license": "MIT",
   "devDependencies": {
     "@opencode/cli": "2.0.14",
-    "tsup": "^8.5.1",
+    "@types/node": "26.6.2",
+    "tsup": "8.5.1",
     "typescript": "7.0.2"
   }
 }
