@@ -1,12 +1,20 @@
 /** @vitest-environment happy-dom */
 import { test, expect } from "vitest";
-import { EmbConstant as C, EmbPattern, readSvg } from "./internal.ts";
+import { EmbConstant as C, EmbPattern, readPes, readSvg, writePes } from "./internal.ts";
 import { normalizeSvg } from "../src/svg/normalize.ts";
 import { flattenSvgPath } from "../src/svg/pathData.ts";
 
 function blocks(pattern: EmbPattern) {
   return [...pattern.getAsStitchblock()];
 }
+
+/** Commands written between the first and the last stitch, after PES encoding (tie stitches aside). */
+const commandsBetweenBlocks = (pattern: EmbPattern) => {
+  const commands = readPes(writePes(pattern)).stitches.map(([, , command]) => command);
+  const first = commands.indexOf(C.STITCH);
+  const last = commands.lastIndexOf(C.STITCH);
+  return commands.slice(first, last).filter((command) => command !== C.STITCH);
+};
 
 const hasPoint = (block: number[][], x: number, y: number) =>
   block.some(([px, py]) => Math.abs(px - x) < 1e-6 && Math.abs(py - y) < 1e-6);
@@ -365,8 +373,9 @@ test("readSvg: jumps between separate shape blocks", () => {
      </svg>`,
     { size: 50, stitchLength: 1000 }
   );
-  expect(pattern.stitches.filter((stitch) => stitch[2] === C.JUMP)).toHaveLength(1);
   expect(blocks(pattern)).toHaveLength(2);
+  // Written out, the thread is trimmed before jumping to the second line.
+  expect(commandsBetweenBlocks(pattern)).toStrictEqual([C.TRIM, C.JUMP]);
 });
 
 test("readSvg: converts basic shapes to centerline paths", () => {
@@ -629,8 +638,8 @@ test("readSvg: jumps between separate islands of one fill", () => {
   const pattern = readSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10 10H20V20H10Z M60 60H70V70H60Z"/></svg>`
   );
-  expect(pattern.stitches.filter(([, , command]) => command === C.JUMP)).toHaveLength(1);
   expect(blocks(pattern)).toHaveLength(2);
+  expect(commandsBetweenBlocks(pattern)).toStrictEqual([C.TRIM, C.JUMP]);
 });
 
 test("readSvg: skips fill=none and zero-area fills", () => {
@@ -848,4 +857,18 @@ test("readSvg: ignores a missing clipPath with a warning", () => {
   });
   expect(allPoints(pattern).length).toBeGreaterThan(0);
   expect(warnings).toStrictEqual(["Unsupported clip-path url(#nope)"]);
+});
+
+test("readSvg: adds tieStitches at every thread end", () => {
+  const svg = svg100(`<path d="M10 10H40" stroke="#000" stroke-width="0.3"/><path d="M60 60H90" stroke="#000" stroke-width="0.3"/>`);
+  const stitches = (tieStitches: number) =>
+    readPes(writePes(readSvg(svg, { tieStitches }))).stitches.filter(([, , command]) => command === C.STITCH);
+  // Off by default; otherwise that many stitches at each of the four thread ends: start, both sides of the jump, end.
+  expect(stitches(0)).toStrictEqual(readPes(writePes(readSvg(svg))).stitches.filter(([, , c]) => c === C.STITCH));
+  expect(stitches(2).length - stitches(0).length).toBe(8);
+  expect(stitches(3).length - stitches(0).length).toBe(12);
+  // Out a third of the first 2.5 mm stitch and back, then on along the line.
+  const [start, a, b, c] = stitches(2);
+  expect([a[0] - start[0], b[0] - start[0], c[0] - start[0]]).toStrictEqual([8, 0, 25]);
+  expect(() => readSvg(svg, { tieStitches: 1.5 })).toThrow(/tieStitches/);
 });

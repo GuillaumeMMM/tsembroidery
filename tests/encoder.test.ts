@@ -580,12 +580,13 @@ test("OPTION_ENABLE_TIE_OFF / OPTION_DISABLE_TIE_OFF toggle mid-stream", () => {
     [20, 20, C.STITCH],
     [30, 30, C.TRIM],
   ]);
-  expect(dest.stitches).toStrictEqual([
+  // The tie-off runs back along the last stitch (toward 0,0) and returns before the trim.
+  expect(dest.stitches.map(([x, y, c]) => [+x.toFixed(2), +y.toFixed(2), c])).toStrictEqual([
     [0, 0, C.STITCH],
     [5, 5, C.STITCH],
-    [5, 5, C.STITCH],
-    [5, 5, C.STITCH],
-    [5, 5, C.STITCH],
+    [3.35, 3.35, C.STITCH],
+    [1.7, 1.7, C.STITCH],
+    [3.35, 3.35, C.STITCH],
     [5, 5, C.STITCH],
     [5, 5, C.TRIM],
     [20, 20, C.STITCH],

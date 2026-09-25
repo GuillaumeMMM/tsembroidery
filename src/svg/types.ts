@@ -68,6 +68,8 @@ export interface SvgReadSettings {
   rowSpacing?: number;
   /** Colors closer than this (red-mean distance, 0-765) share one thread. Default 10; 0 merges exact matches only. */
   colorTolerance?: number;
+  /** Small back-and-forth stitches added wherever the thread is cut (both sides of jumps and color changes), so it holds. Default 0. */
+  tieStitches?: number;
   /** Maximum nesting of `<use>` references. Default 32. */
   maxUseDepth?: number;
   /** Maximum number of expanded `<use>` references. Default 10000. */

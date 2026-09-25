@@ -85,6 +85,9 @@ export interface EncoderSettings {
   rotate?: number;
 }
 
+/** Commands that end a run of stitches; a tie-off doesn't look past them. */
+const BREAKS = new Set<number>([JUMP, TRIM, STOP, END, COLOR_CHANGE, STITCH_BREAK, SEQUENCE_BREAK, COLOR_BREAK, FRAME_EJECT]);
+
 export class Transcoder {
   maxStitch: number;
   maxJump: number;
@@ -454,22 +457,22 @@ export class Transcoder {
 
   tieOff(): void {
     const source = this.sourcePattern!.stitches;
+    // pyembroidery anchors on the stitch just before, which is usually where the needle already is,
+    // so its lock stitches don't move. Anchor on the last stitch away from the needle instead.
     // Position 0 wraps to the last stitch, like Python's stitches[-1].
-    let index = this.position - 1;
-    if (index < 0) index = source.length + index;
-    const previous = index >= 0 ? source[index] : undefined;
-    if (previous === undefined) {
-      return;
-    }
-    const b = pointInMatrixSpace(this.matrix, previous);
-    const flags = b[2] as Command | number;
-    if (
-      flags === STITCH ||
-      flags === NEEDLE_AT ||
-      flags === SEW_TO ||
-      flags === SEQUIN_EJECT
-    ) {
-      this.lockStitch(this.needleX, this.needleY, b[0], b[1], this.maxStitch);
+    for (let offset = 1; offset <= source.length; offset += 1) {
+      let index = this.position - offset;
+      if (index < 0) index += source.length;
+      const b = pointInMatrixSpace(this.matrix, source[index]);
+      const flags = b[2] as Command | number;
+      if (flags === STITCH || flags === NEEDLE_AT || flags === SEW_TO || flags === SEQUIN_EJECT) {
+        if (b[0] !== this.needleX || b[1] !== this.needleY) {
+          this.lockStitch(this.needleX, this.needleY, b[0], b[1], this.maxStitch);
+          return;
+        }
+      } else if (BREAKS.has(flags)) {
+        return;
+      }
     }
   }
 

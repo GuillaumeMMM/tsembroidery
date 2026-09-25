@@ -53,6 +53,7 @@ Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in t
 | `rowSpacing`       | `0.4`   | Gap between parallel stitches in fills and satin, in mm.                                                     |
 | `pullCompensation` | `0.2`   | Fills and satin are widened by this much on each side, in mm, so seams stay closed when the fabric pulls in. |
 | `underlay`         | `true`  | Stitch a holding layer under fills and satin first.                                                          |
+| `tieStitches`      | `0`     | Small back-and-forth stitches added wherever the thread is cut (start, end, both sides of jumps and color changes) so it holds. `2` or more locks the start too. |
 | `colorTolerance`   | `10`    | Colors closer than this (0–765) share one thread. `0` keeps every distinct color.                            |
 | `flattenTolerance` | `0.05`  | Maximum error when curves are turned into lines, in mm.                                                      |
 
