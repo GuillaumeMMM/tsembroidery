@@ -1,9 +1,8 @@
-/** Port of pyembroidery's EmbThread. */
 import { pyRound } from "./pyMath.js";
 
 export type ColorSource = number | EmbThread;
 
-function colorDistanceRedMean(
+export function colorDistanceRedMean(
   r1: number,
   g1: number,
   b1: number,

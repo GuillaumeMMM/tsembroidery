@@ -11,21 +11,14 @@ import { EmbPattern } from "../pattern.js";
 import { EmbThread } from "../thread.js";
 import { readPec } from "./pec.js";
 
-export function readPes(
-  bytes: Uint8Array,
-  settings?: Record<string, unknown>,
-  pattern?: EmbPattern
-): EmbPattern {
-  const out = pattern ?? new EmbPattern();
-  readPesInto(new ByteReader(bytes), out, settings);
-  return out;
+/** Parses a Brother .pes file. Coordinates are in 0.1 mm. */
+export function readPes(bytes: Uint8Array): EmbPattern {
+  const pattern = new EmbPattern();
+  readPesInto(new ByteReader(bytes), pattern);
+  return pattern;
 }
 
-export function readPesInto(
-  f: ByteReader,
-  out: EmbPattern,
-  _settings?: Record<string, unknown>
-): void {
+export function readPesInto(f: ByteReader, out: EmbPattern): void {
   const loadedThreadValues: EmbThread[] = [];
 
   const pesString = readString8(f, 8);

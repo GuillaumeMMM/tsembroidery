@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { pyRound } from "../src/index.ts";
+import { pyRound } from "./internal.ts";
 
 test("pyRound: no rounding needed", () => {
   expect(pyRound(0)).toBe(0);

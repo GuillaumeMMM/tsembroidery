@@ -6,8 +6,8 @@ import {
   Transcoder,
   towards,
   pointInMatrixSpace,
-} from "../src/index.ts";
-import type { TranscoderSettings } from "../src/index.ts";
+} from "./internal.ts";
+import type { EncoderSettings } from "./internal.ts";
 
 const closeTo = (a: number, b: number, eps = 1e-9) =>
   expect(Math.abs(a - b) < eps, `expected ${a} ≈ ${b}`).toBeTruthy();
@@ -20,7 +20,7 @@ function buildSource(stitches: Array<[number, number, number]>): EmbPattern {
 
 function transcode(
   stitches: Array<[number, number, number]>,
-  settings?: TranscoderSettings
+  settings?: EncoderSettings
 ): EmbPattern {
   const destination = new EmbPattern();
   new Transcoder(settings).transcode(buildSource(stitches), destination);
@@ -129,6 +129,7 @@ test("rotate setting rotates by degrees after translate", () => {
 });
 
 test("invalid transform settings restate python's TypeError", () => {
+  // @ts-expect-error invalid on purpose
   expect(() => new Transcoder({ translate: 5 })).toThrow(TypeError);
   expect(() => new Transcoder({ scale: [2] })).toThrow(TypeError);
   // @ts-expect-error invalid on purpose

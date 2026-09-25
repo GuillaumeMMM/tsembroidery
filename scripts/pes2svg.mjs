@@ -1,14 +1,5 @@
 #!/usr/bin/env node
-/**
- * PES -> SVG converter.
- *
- *   node scripts/pes2svg.mjs <input.pes> [output.svg]
- *
- * The output path defaults to the input path with a ".svg" extension.
- * Lives outside src/ on purpose: the library itself takes a Uint8Array
- * and returns a string with zero Node built-ins; only this CLI touches
- * the filesystem.
- */
+// Usage: node scripts/pes2svg.mjs <input.pes> [output.svg]  (run `npm run build` first)
 import { readFileSync, writeFileSync } from "node:fs";
 import { extname } from "node:path";
 import { pesToSvg } from "../dist/index.js";

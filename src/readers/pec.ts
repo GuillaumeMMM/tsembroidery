@@ -1,4 +1,3 @@
-/** Port of pyembroidery's PecReader; preview graphics are skipped. */
 import { ByteReader, readInt8, readInt24le } from "../binary.js";
 import { EmbPattern } from "../pattern.js";
 import { EmbThread } from "../thread.js";

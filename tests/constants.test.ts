@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { EmbConstant } from "../src/index.ts";
+import { EmbConstant } from "./internal.ts";
 
 test("EmbConstant core command values", () => {
   expect(EmbConstant.NO_COMMAND).toBe(-1);

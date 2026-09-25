@@ -15,7 +15,7 @@ import {
   readInt32be,
   readString8,
   readString16,
-} from "../src/index.ts";
+} from "./internal.ts";
 import { ByteWriter } from "../src/binaryWriter.ts";
 
 function reader(...bytes: number[]): ByteReader {

@@ -10,7 +10,7 @@ import {
   distanceSquared,
   towards,
   oriented,
-} from "../src/index.ts";
+} from "./internal.ts";
 
 const closeTo = (a: number, b: number, eps = 1e-9) =>
   expect(Math.abs(a - b) < eps, `expected ${a} ≈ ${b}`).toBeTruthy();

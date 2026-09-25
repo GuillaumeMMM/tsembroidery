@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { test, expect } from "vitest";
-import { EmbConstant as C, readPes, writePes } from "../src/index.ts";
+import { EmbConstant as C, readPes, writePes } from "./internal.ts";
 
 const fixture = (name: string) =>
   new Uint8Array(readFileSync(new URL(`fixtures/${name}`, import.meta.url)));

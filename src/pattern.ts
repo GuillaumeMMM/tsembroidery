@@ -2,7 +2,7 @@
 import { EmbConstant, type Command } from "./constants.js";
 import { EmbThread } from "./thread.js";
 import { pyRound } from "./pyMath.js";
-import { Transcoder, type TranscoderSettings } from "./encoder.js";
+import { Transcoder, type EncoderSettings } from "./encoder.js";
 
 /** Value equality: PES v6 reads equal threads as separate objects. */
 function sameThread(a: EmbThread, b: EmbThread): boolean {
@@ -450,7 +450,7 @@ export class EmbPattern {
     return stablePattern;
   }
 
-  getNormalizedPattern(encodeSettings?: TranscoderSettings): EmbPattern {
+  getNormalizedPattern(encodeSettings?: EncoderSettings): EmbPattern {
     const normalPattern = new EmbPattern();
     const transcoder = new Transcoder(encodeSettings);
     transcoder.transcode(this, normalPattern);

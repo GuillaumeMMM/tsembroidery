@@ -1,8 +1,18 @@
 {
   "name": "@guillaumemmm/tsembroidery",
   "version": "2.0.0",
-  "description": "Read and write Brother .pes embroidery files and render them as SVG.",
+  "description": "Read and write Brother .pes embroidery files, render them as SVG, and turn flat SVG artwork into stitches.",
+  "keywords": [
+    "embroidery",
+    "pes",
+    "pec",
+    "brother",
+    "svg",
+    "stitch",
+    "pyembroidery"
+  ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,13 +23,13 @@
     }
   },
   "files": [
-    "/dist"
+    "dist"
   ],
   "scripts": {
     "build": "tsup && tsc -p tsconfig.json --emitDeclarationOnly",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.check.json",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build && npm run typecheck && npm test"
   },
   "author": "guillaumemmm",
   "repository": {
@@ -28,14 +38,22 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^24.13.6",
-    "happy-dom": "^20.14.5",
+    "@types/node": "24.13.6",
+    "happy-dom": "20.14.5",
     "tsup": "8.5.1",
     "typescript": "7.0.2",
     "vitest": "5.0.1"
   },
   "dependencies": {
+    "clipper2-ts": "^2.0.1-18",
     "colord": "^2.10.0",
     "svg-pathdata": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "homepage": "https://github.com/GuillaumeMMM/tsembroidery#readme",
+  "bugs": {
+    "url": "https://github.com/GuillaumeMMM/tsembroidery/issues"
   }
 }

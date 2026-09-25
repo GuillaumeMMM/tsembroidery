@@ -4,7 +4,7 @@ import type { EmbThread } from "./thread.js";
 import { EmbPattern } from "./pattern.js";
 import type { Extents, Stitch } from "./pattern.js";
 import { getThreadSet } from "./pecThreads.js";
-import type { TranscoderSettings } from "./encoder.js";
+import type { EncoderSettings } from "./encoder.js";
 import { ByteWriter } from "./binaryWriter.js";
 import { finiteExtents, truncateUtf8, writePec } from "./writePec.js";
 import type { PecColorInfo } from "./writePec.js";
@@ -28,18 +28,21 @@ const PES_VERSION_6_SIGNATURE = "#PES0060";
 const MAX_PES_DELTA = 2047;
 const encoder = new TextEncoder();
 
-export interface PesSettings extends TranscoderSettings {
+export interface PesWriteSettings extends EncoderSettings {
+  /** Run the encoder first, splitting stitches longer than PES allows. Default true. */
   encode?: boolean;
+  /** PES format version. Version 6 keeps exact thread colors and metadata. Default 6. */
   version?: 1 | 6;
 }
 
-export type SvgToPesSettings = PesSettings & SvgReadSettings;
+export type SvgToPesSettings = PesWriteSettings & SvgReadSettings;
 
+/** Serializes a pattern as a Brother .pes file. */
 export function writePes(
   source: EmbPattern,
-  settings?: PesSettings
+  settings?: PesWriteSettings
 ): Uint8Array {
-  const values: PesSettings = { ...(settings ?? {}) };
+  const values: PesWriteSettings = { ...(settings ?? {}) };
   const version = values.version ?? 6;
   if (version !== 1 && version !== 6) {
     throw new RangeError(`writePes: unsupported PES version ${String(version)}`);
@@ -47,7 +50,7 @@ export function writePes(
 
   let normalized: EmbPattern;
   if (values.encode ?? true) {
-    const encodeSettings: TranscoderSettings = { ...values };
+    const encodeSettings: EncoderSettings = { ...values };
     if (encodeSettings.max_jump === undefined) {
       encodeSettings.max_jump = MAX_PES_DELTA;
     }
@@ -67,6 +70,7 @@ export function writePes(
   return version === 6 ? writeVersion6(normalized) : writeVersion1(normalized);
 }
 
+/** Converts SVG artwork straight to a .pes file (`readSvg` then `writePes`). */
 export function svgToPes(
   input: SvgInput,
   settings?: SvgToPesSettings

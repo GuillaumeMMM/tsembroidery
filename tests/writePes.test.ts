@@ -7,7 +7,7 @@ import {
   readInt32le,
   readPes,
   writePes,
-} from "../src/index.ts";
+} from "./internal.ts";
 
 function thread(r: number, g: number, b: number): EmbThread {
   const t = new EmbThread();

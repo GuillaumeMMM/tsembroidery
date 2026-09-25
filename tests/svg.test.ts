@@ -6,7 +6,7 @@ import {
   writeSvg,
   pesToSvg,
   towards,
-} from "../src/index.ts";
+} from "./internal.ts";
 
 const svgHeader = (width: string, height: string, viewBox: string) =>
   `<svg version="1.1" xmlns="http://www.w3.org/2000/svg"` +

@@ -1,7 +1,8 @@
 import { EmbConstant } from "../constants.js";
 import { EmbPattern } from "../pattern.js";
-import { pathToStitches, resolvePathStitchOptions } from "../svg/pathData.js";
+import { resolvePathStitchOptions } from "../svg/pathData.js";
 import { normalizeSvg } from "../svg/normalize.js";
+import { planStitches } from "../svg/plan.js";
 import type { SvgReadSettings } from "../svg/types.js";
 
 export type SvgInput = string | Uint8Array;
@@ -20,6 +21,7 @@ export function decodeSvgInput(input: SvgInput): string {
   return source.replace(/^\uFEFF/, "");
 }
 
+/** Fills become tatami and strokes running or satin stitches; hidden parts are dropped and colors grouped. */
 export function readSvg(
   input: SvgInput,
   settings: SvgReadSettings = {}
@@ -27,28 +29,22 @@ export function readSvg(
   const stitchOptions = resolvePathStitchOptions({
     stitchLength: settings.stitchLength,
     flattenTolerance: settings.flattenTolerance,
-    satinUnderlay: settings.satinUnderlay,
+    underlay: settings.underlay,
+    pullCompensation: settings.pullCompensation,
+    rowSpacing: settings.rowSpacing,
   });
   const normalized = normalizeSvg(decodeSvgInput(input), settings);
   normalized.warnings.forEach((warning) => settings.onWarning?.(warning));
   const pattern = new EmbPattern();
   let hasStitches = false;
 
-  for (const shape of normalized.shapes) {
-    for (const block of pathToStitches(shape, stitchOptions)) {
-      const firstStitch = block[0].find(
-        (stitch) => stitch[2] === EmbConstant.STITCH
-      );
-      if (hasStitches && firstStitch) {
-        pattern.addStitchAbsolute(
-          EmbConstant.JUMP,
-          firstStitch[0],
-          firstStitch[1]
-        );
-      }
-      pattern.addStitchblock(block);
-      hasStitches = true;
+  for (const block of planStitches(normalized.shapes, stitchOptions)) {
+    const firstStitch = block[0].find((stitch) => stitch[2] === EmbConstant.STITCH);
+    if (hasStitches && firstStitch) {
+      pattern.addStitchAbsolute(EmbConstant.JUMP, firstStitch[0], firstStitch[1]);
     }
+    pattern.addStitchblock(block);
+    hasStitches = true;
   }
   return pattern;
 }

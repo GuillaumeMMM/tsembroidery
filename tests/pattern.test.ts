@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
-import { EmbConstant as C, EmbPattern, EmbThread } from "../src/index.ts";
-import type { Stitch } from "../src/index.ts";
+import { EmbConstant as C, EmbPattern, EmbThread } from "./internal.ts";
+import type { Stitch } from "./internal.ts";
 
 function thread(r: number, g: number, b: number): EmbThread {
   const t = new EmbThread();

@@ -1,4 +1,3 @@
-/** Brother PEC thread chart, indexed by PEC color bytes. */
 import { EmbThread } from "./thread.js";
 
 export class EmbThreadPec extends EmbThread {

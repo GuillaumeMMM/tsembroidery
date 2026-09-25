@@ -28,6 +28,19 @@ export function composeSvgMatrix(outer: Matrix, inner: Matrix): Matrix {
   return matrixMultiply(inner, outer);
 }
 
+export function invertMatrix(m: Matrix): Matrix {
+  const [a, b, , c, d, , e, f] = m;
+  const determinant = a * d - b * c;
+  return svgMatrix(
+    d / determinant,
+    -b / determinant,
+    -c / determinant,
+    a / determinant,
+    (c * f - d * e) / determinant,
+    (b * e - a * f) / determinant
+  );
+}
+
 function transformMatrix(name: string, v: number[]): Matrix {
   switch (name) {
     case "matrix":

@@ -1,10 +1,10 @@
 import { colord, extend } from "colord";
 import namesPlugin from "colord/plugins/names";
 import { EmbThread } from "../thread.js";
+import { matchingDeclarations, parseDeclarations, type CssRule, type Declaration } from "./css.js";
 import { parseSvgLength } from "./numbers.js";
 import type { SvgFillStyle, SvgStrokeStyle } from "./types.js";
 
-extend([namesPlugin]);
 
 const PRESENTATION_ATTRIBUTES = [
   "stroke",
@@ -17,10 +17,20 @@ const PRESENTATION_ATTRIBUTES = [
   "stroke-dashoffset",
   "fill-rule",
   "clip-rule",
+  "clip-path",
   "opacity",
   "display",
   "visibility",
+  "stop-color",
 ];
+
+export interface StyleContext {
+  rules: CssRule[];
+  /** Flat color for a `url(#id)` paint server, or null. */
+  resolvePaint: (id: string) => EmbThread | null;
+}
+
+const NO_STYLES: StyleContext = { rules: [], resolvePaint: () => null };
 
 export interface SvgStyleState {
   stroke: EmbThread | null;
@@ -57,8 +67,15 @@ export function getDefaultSvgStyle(): SvgStyleState {
 }
 
 /** `none` and fully transparent colors give null. */
+let namesLoaded = false;
+
 export function parseSvgColor(value: string | null | undefined): EmbThread | null {
   if (value === null || value === undefined) return null;
+  // Registered on first use so importing the package has no side effects.
+  if (!namesLoaded) {
+    extend([namesPlugin]);
+    namesLoaded = true;
+  }
   const color = colord(value.trim().toLowerCase());
   if (!color.isValid() || color.alpha() === 0) return null;
   const { r, g, b } = color.toRgb();
@@ -67,15 +84,24 @@ export function parseSvgColor(value: string | null | undefined): EmbThread | nul
   return thread;
 }
 
-function applyProperty(style: SvgStyleState, property: string, value: string): void {
-  const name = property.trim().toLowerCase();
-  const text = value.trim();
+function parsePaint(text: string, style: SvgStyleState, context: StyleContext): EmbThread | null {
+  if (text.toLowerCase() === "currentcolor") return style.color;
+  const reference = text.match(/^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)\s*(.*)$/i);
+  if (reference === null) return parseSvgColor(text);
+  return context.resolvePaint(reference[1]) ?? parseSvgColor(reference[2]);
+}
+
+function applyProperty(
+  style: SvgStyleState,
+  [name, text]: Declaration,
+  context: StyleContext
+): void {
   const keyword = text.toLowerCase();
   if (keyword === "inherit") return;
   switch (name) {
     case "stroke":
     case "fill":
-      style[name] = keyword === "currentcolor" ? style.color : parseSvgColor(text);
+      style[name] = parsePaint(text, style, context);
       break;
     case "color":
       style.color = parseSvgColor(text) ?? style.color;
@@ -100,7 +126,6 @@ function applyProperty(style: SvgStyleState, property: string, value: string): v
       break;
     }
     case "fill-rule":
-    case "clip-rule":
       if (keyword === "evenodd" || keyword === "nonzero") style.fillRule = keyword;
       break;
     case "opacity": {
@@ -117,20 +142,31 @@ function applyProperty(style: SvgStyleState, property: string, value: string): v
   }
 }
 
+/** Presentation attributes, then stylesheet rules, then the inline style: last one wins. */
+export function cascade(element: Element, tag: string, rules: CssRule[]): Declaration[] {
+  const declarations: Declaration[] = [];
+  for (const property of PRESENTATION_ATTRIBUTES) {
+    const value = element.getAttribute(property)?.trim();
+    if (value) declarations.push([property, value]);
+  }
+  declarations.push(...matchingDeclarations(element, tag, rules));
+  declarations.push(...parseDeclarations(element.getAttribute("style") ?? ""));
+  return declarations;
+}
+
+export function declaredValue(element: Element, tag: string, rules: CssRule[], property: string): string | null {
+  return cascade(element, tag, rules).filter(([name]) => name === property).pop()?.[1] ?? null;
+}
+
 export function applySvgStyle(
   element: Element,
-  inherited: SvgStyleState
+  tag: string,
+  inherited: SvgStyleState,
+  context: StyleContext = NO_STYLES
 ): SvgStyleState {
   const style = { ...inherited };
-  for (const property of PRESENTATION_ATTRIBUTES) {
-    const value = element.getAttribute(property);
-    if (value !== null) applyProperty(style, property, value);
-  }
-  for (const declaration of element.getAttribute("style")?.split(";") ?? []) {
-    const separator = declaration.indexOf(":");
-    if (separator >= 0) {
-      applyProperty(style, declaration.slice(0, separator), declaration.slice(separator + 1));
-    }
+  for (const declaration of cascade(element, tag, context.rules)) {
+    applyProperty(style, declaration, context);
   }
   return style;
 }

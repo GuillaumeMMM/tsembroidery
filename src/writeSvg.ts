@@ -1,13 +1,14 @@
-/** Port of pyembroidery's SvgWriter. */
 import { EmbConstant } from "./constants.js";
 import type { EmbPattern } from "./pattern.js";
-import type { TranscoderSettings } from "./encoder.js";
+import type { EncoderSettings } from "./encoder.js";
 import { readPes } from "./readers/pes.js";
 
 const { CONTINGENCY_SEQUIN_STITCH } = EmbConstant;
 
-export interface SvgSettings extends TranscoderSettings {
+export interface SvgWriteSettings extends EncoderSettings {
+  /** Run the encoder first. Default true. */
   encode?: boolean;
+  /** `pesToSvg` only: regroup stitches into clean runs before drawing. Default true. */
   stable?: boolean;
 }
 
@@ -46,8 +47,9 @@ function serializeSvg(pattern: EmbPattern): string {
   return out;
 }
 
-export function writeSvg(pattern: EmbPattern, settings?: SvgSettings): string {
-  const s: SvgSettings = { ...(settings ?? {}) };
+/** Draws a pattern as SVG: one path per stitch run, in 0.1 mm units. */
+export function writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings): string {
+  const s: SvgWriteSettings = { ...(settings ?? {}) };
 
   if (s.encode ?? true) {
     if (s.max_jump === undefined) s.max_jump = Infinity;
@@ -62,8 +64,9 @@ export function writeSvg(pattern: EmbPattern, settings?: SvgSettings): string {
   return serializeSvg(pattern);
 }
 
-export function pesToSvg(bytes: Uint8Array, settings?: SvgSettings): string {
-  let pattern = readPes(bytes, settings);
+/** Renders a .pes file as SVG. */
+export function pesToSvg(bytes: Uint8Array, settings?: SvgWriteSettings): string {
+  let pattern = readPes(bytes);
   const stable = settings?.stable ?? true;
   if (stable) pattern = pattern.getStablePattern();
   return writeSvg(pattern, settings);

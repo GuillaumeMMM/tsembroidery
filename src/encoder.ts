@@ -1,4 +1,3 @@
-/** Port of pyembroidery's Transcoder (EmbEncoder.py). */
 import { EmbConstant, type Command } from "./constants.js";
 import type { EmbPattern, Stitch } from "./pattern.js";
 import {
@@ -56,23 +55,35 @@ const {
   CONTINGENCY_SEQUIN_REMOVE,
 } = EmbConstant;
 
+/** A point as `[x, y]` or `{ x, y }`. */
 export type PointLike = [number, ...number[]] | { x: number; y: number };
 
-export interface TranscoderSettings {
+/** Options of the stitch encoder (pyembroidery's names). Lengths in 0.1 mm. */
+export interface EncoderSettings {
+  /** Longer stitches are split. */
   max_stitch?: number;
+  /** Longer jumps are split. */
   max_jump?: number;
+  /** Always jump all the way to the next block's start. */
   full_jump?: boolean;
   strip_sequins?: boolean;
+  /** An `EmbConstant.CONTINGENCY_SEQUIN_*` value. */
   sequin_contingency?: number;
+  /** Drop SLOW/FAST commands. Default true. */
   strip_speeds?: boolean;
+  /** Trim before color changes. Default true. */
   explicit_trim?: boolean;
+  /** Add lock stitches at the start of each block. */
   tie_on?: boolean;
+  /** Add lock stitches at the end of each block. */
   tie_off?: boolean;
+  /** An `EmbConstant.CONTINGENCY_*` value for stitches longer than `max_stitch`. */
   long_stitch_contingency?: number;
-  translate?: number | PointLike;
+  translate?: PointLike;
+  /** A factor, or separate x and y factors. */
   scale?: number | PointLike;
+  /** Degrees. */
   rotate?: number;
-  [key: string]: unknown;
 }
 
 export class Transcoder {
@@ -97,7 +108,7 @@ export class Transcoder {
   needleY = 0;
   stateJumping = false;
 
-  constructor(settings: TranscoderSettings = {}) {
+  constructor(settings: EncoderSettings = {}) {
     this.maxStitch = settings.max_stitch ?? Infinity;
     this.maxJump = settings.max_jump ?? Infinity;
     this.fullJump = settings.full_jump ?? false;

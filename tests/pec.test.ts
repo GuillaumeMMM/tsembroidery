@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { ByteReader, EmbConstant as C, EmbPattern, EmbThread, readPec } from "../src/index.ts";
+import { ByteReader, EmbConstant as C, EmbPattern, EmbThread, readPec } from "./internal.ts";
 import {
   buildPecBlock,
   encStitch,

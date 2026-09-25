@@ -8,7 +8,7 @@ import {
   readPes,
   readSvg,
   svgToPes,
-} from "../src/index.ts";
+} from "./internal.ts";
 
 function ascii(bytes: Uint8Array, start: number, length: number): string {
   return new TextDecoder("utf-8", { fatal: true }).decode(

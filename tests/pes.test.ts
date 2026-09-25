@@ -5,7 +5,7 @@ import {
   EmbPattern,
   EmbThread,
   readPesInto,
-} from "../src/index.ts";
+} from "./internal.ts";
 import {
   buildPecBlock,
   buildPes,

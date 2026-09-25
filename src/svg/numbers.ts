@@ -15,7 +15,6 @@ const SVG_UNITS_TO_PX: Record<string, number> = {
   q: 96 / 101.6,
 };
 
-/** Throws on malformed input. */
 export function parseNumberList(value: string, context: string): number[] {
   const text = value.trim();
   if (text === "") return [];

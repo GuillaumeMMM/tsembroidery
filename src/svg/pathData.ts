@@ -1,11 +1,9 @@
 import { SVGPathData } from "svg-pathdata";
-import { EmbConstant } from "../constants.js";
 import type { Matrix } from "../matrix.js";
-import type { Stitch, StitchBlock } from "../pattern.js";
 import { UNITS_PER_MM } from "./numbers.js";
 import type { SvgShape } from "./types.js";
 
-interface Point2 {
+export interface Point2 {
   x: number;
   y: number;
 }
@@ -19,12 +17,14 @@ export interface FlatPathSubpath {
 export interface PathStitchOptions {
   stitchLength?: number;
   flattenTolerance?: number;
-  satinUnderlay?: boolean;
+  underlay?: boolean;
+  pullCompensation?: number;
+  rowSpacing?: number;
 }
 
-const SATIN_MIN_WIDTH = 1 * UNITS_PER_MM;
-// TODO: satin stitches get loose above ~7 mm; convert wider strokes to outlines and fill them once the fill stitcher exists.
-const SATIN_SPACING = 0.4 * UNITS_PER_MM;
+export const SATIN_MIN_WIDTH = 1 * UNITS_PER_MM;
+/** Wider satin stitches get loose and snag; wider strokes are filled instead. */
+export const SATIN_MAX_WIDTH = 7 * UNITS_PER_MM;
 
 function distance(a: Point2, b: Point2): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
@@ -105,7 +105,7 @@ export function flattenSvgPath(
   return subpaths;
 }
 
-function resample(points: Point2[], closed: boolean, stitchLength: number): Point2[] {
+export function resample(points: Point2[], closed: boolean, stitchLength: number): Point2[] {
   const output: Point2[] = [points[0]];
   const segments = closed ? [...points, points[0]] : points;
   for (let index = 1; index < segments.length; index += 1) {
@@ -129,10 +129,9 @@ function resample(points: Point2[], closed: boolean, stitchLength: number): Poin
   return output;
 }
 
-/** Zigzags across `width`, centered on the path. */
-function satin(points: Point2[], closed: boolean, width: number): Point2[] {
-  // Same-side peaks are SATIN_SPACING apart.
-  const samples = resample(points, closed, SATIN_SPACING / 2);
+function satin(points: Point2[], closed: boolean, width: number, spacing: number): Point2[] {
+  // Same-side peaks are `spacing` apart.
+  const samples = resample(points, closed, spacing / 2);
   const last = samples.length - 1;
   let normal = { x: 0, y: 0 };
   return samples.map((point, index) => {
@@ -150,42 +149,45 @@ function satin(points: Point2[], closed: boolean, width: number): Point2[] {
 export function resolvePathStitchOptions(
   options: PathStitchOptions = {}
 ): Required<PathStitchOptions> {
-  const { stitchLength = 2.5, flattenTolerance = 0.05, satinUnderlay = true } = options;
+  const {
+    stitchLength = 2.5,
+    flattenTolerance = 0.05,
+    underlay = true,
+    pullCompensation = 0.2,
+    rowSpacing = 0.4,
+  } = options;
   if (!Number.isFinite(stitchLength) || stitchLength <= 0) {
     throw new RangeError("SVG stitch length must be a positive finite number");
   }
   if (!Number.isFinite(flattenTolerance) || flattenTolerance <= 0) {
     throw new RangeError("SVG flatten tolerance must be a positive finite number");
   }
-  return { stitchLength, flattenTolerance, satinUnderlay };
+  if (!Number.isFinite(pullCompensation) || pullCompensation < 0) {
+    throw new RangeError("SVG pull compensation must be a non-negative number");
+  }
+  if (!Number.isFinite(rowSpacing) || rowSpacing <= 0) {
+    throw new RangeError("SVG row spacing must be a positive finite number");
+  }
+  return { stitchLength, flattenTolerance, underlay, pullCompensation, rowSpacing };
 }
 
-export function pathToStitches(
-  shape: SvgShape,
-  options: PathStitchOptions = {}
-): StitchBlock[] {
-  if (shape.outline === null) return [];
-  const { stitchLength, flattenTolerance, satinUnderlay } = resolvePathStitchOptions(options);
-
+/** Stroke width in pattern units, after the shape's transform. */
+export function strokeWidth(shape: SvgShape): number {
   const [a, b, , c, d] = shape.transform;
-  const width = shape.outline.style.width * Math.sqrt(Math.abs(a * d - b * c));
-  const stitches: Stitch[] = [];
-  for (const subpath of flattenSvgPath(shape.outline.d, flattenTolerance * UNITS_PER_MM, shape.transform)) {
-    const run = resample(subpath.points, subpath.closed, stitchLength * UNITS_PER_MM);
-    let points = run;
-    if (width >= SATIN_MIN_WIDTH) {
-      // Underlay walks the centerline, then the satin comes back over it.
-      const back = subpath.closed ? subpath.points : [...subpath.points].reverse();
-      points = satinUnderlay
-        ? [...run, ...satin(back, subpath.closed, width)]
-        : satin(subpath.points, subpath.closed, width);
-    }
-    if (stitches.length > 0) {
-      stitches.push([points[0].x, points[0].y, EmbConstant.JUMP]);
-    }
-    for (const point of points) {
-      stitches.push([point.x, point.y, EmbConstant.STITCH]);
-    }
-  }
-  return stitches.length > 0 ? [[stitches, shape.outline.style.color]] : [];
+  return (shape.outline?.style.width ?? 0) * Math.sqrt(Math.abs(a * d - b * c));
+}
+
+export function strokePoints(
+  line: FlatPathSubpath,
+  width: number,
+  options: Required<PathStitchOptions>
+): Point2[] {
+  const run = resample(line.points, line.closed, options.stitchLength * UNITS_PER_MM);
+  if (width < SATIN_MIN_WIDTH) return run;
+  width += 2 * options.pullCompensation * UNITS_PER_MM;
+  const spacing = options.rowSpacing * UNITS_PER_MM;
+  if (!options.underlay) return satin(line.points, line.closed, width, spacing);
+  // Underlay walks the centerline, then the satin comes back over it.
+  const back = line.closed ? line.points : [...line.points].reverse();
+  return [...run, ...satin(back, line.closed, width, spacing)];
 }

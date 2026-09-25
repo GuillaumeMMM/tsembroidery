@@ -1,85 +1,56 @@
-import {
-  ByteReader,
-  EmbConstant,
-  EmbPattern,
-  EmbThread,
-  Transcoder,
-  findNearestColorIndex,
-  getThreadSet,
-  pesToSvg,
-  pyRound,
-  readPec,
-  readPes,
-  readPesInto,
-  readSvg,
-  svgToPes,
-  writePes,
-  writeSvg,
-} from "../dist/index.js";
+// Compiled by `npm run typecheck` against the published declarations in dist/.
+import { EmbConstant, EmbPattern, EmbThread, pesToSvg, readPes, readSvg, svgToPes, writePes, writeSvg } from "../dist/index.js";
 import type {
+  Command,
+  EncoderSettings,
   Extents,
-  PesSettings,
+  PesWriteSettings,
   Stitch,
+  StitchBlock,
   SvgInput,
   SvgReadSettings,
-  SvgSettings,
   SvgToPesSettings,
-  TranscoderSettings,
+  SvgWriteSettings,
 } from "../dist/index.js";
 
-const settings: SvgSettings = { encode: false, stable: true, tie_on: true };
+const pattern: EmbPattern = readPes(new Uint8Array());
+const thread = new EmbThread();
+thread.setHexColor("#e53935");
+pattern.addThread(thread);
+pattern.stitchAbs(0, 0);
+pattern.stitch(100, 70);
 
-const pattern: EmbPattern = readPes(new Uint8Array([0x23]), settings);
-const into: EmbPattern = new EmbPattern();
-const returned: EmbPattern = readPes(new Uint8Array(), undefined, into);
-if (returned !== into) throw new Error("pattern param must be returned");
-
-readPesInto(new ByteReader(new Uint8Array()), new EmbPattern(), {});
-
-readPec(new ByteReader(new Uint8Array()), new EmbPattern(), [new EmbThread()]);
-
-const encoderSettings: TranscoderSettings = {
-  max_stitch: 10,
-  sequin_contingency: EmbConstant.CONTINGENCY_SEQUIN_STITCH,
-  matrix: undefined,
-};
+const encoderSettings: EncoderSettings = { max_stitch: 100, tie_on: true, translate: [10, 10] };
 const normalized: EmbPattern = pattern.getNormalizedPattern(encoderSettings);
-const stable: EmbPattern = pattern.getStablePattern();
-const transcoder = new Transcoder({ strip_sequins: true });
-void transcoder;
+const pesSettings: PesWriteSettings = { version: 1, encode: true, max_jump: 2047 };
+const pes: Uint8Array = writePes(pattern, pesSettings);
 
-const svg1: string = writeSvg(pattern, settings);
-const svg2: string = writeSvg(normalized);
-const svg3: string = pesToSvg(new Uint8Array(), {
-  sequin_contingency: EmbConstant.CONTINGENCY_SEQUIN_STITCH,
-});
-const svg4: string = pesToSvg(new Uint8Array(), { stable: false });
+const svgWriteSettings: SvgWriteSettings = { stable: false };
+const svg: string = writeSvg(normalized, svgWriteSettings);
+const preview: string = pesToSvg(pes, { stable: true });
 
-const pesSettings: PesSettings = { version: 6, encode: true, max_stitch: 2047 };
-const svgInput: SvgInput = new TextEncoder().encode("<svg></svg>");
-const svgReadSettings: SvgReadSettings = { stitchLength: 2, onWarning: (message: string) => void message };
-const svgToPesSettings: SvgToPesSettings = { version: 1, stitchLength: 2 };
-const pes1: Uint8Array = writePes(pattern, pesSettings);
-const parsedSvg: EmbPattern = readSvg(svgInput, svgReadSettings);
-const pes2: Uint8Array = svgToPes("<svg></svg>", svgToPesSettings);
-const pes3: Uint8Array = svgToPes(svgInput, { version: 6 });
+const input: SvgInput = new TextEncoder().encode("<svg></svg>");
+const readSettings: SvgReadSettings = {
+  size: 100,
+  stitchLength: 2.5,
+  rowSpacing: 0.4,
+  pullCompensation: 0.2,
+  underlay: true,
+  colorTolerance: 10,
+  onWarning: (message: string) => void message,
+};
+const fromSvg: EmbPattern = readSvg(input, readSettings);
+const svgToPesSettings: SvgToPesSettings = { ...readSettings, version: 6 };
+const converted: Uint8Array = svgToPes("<svg></svg>", svgToPesSettings);
 
-const stitch: Stitch = [0, 0, EmbConstant.STITCH];
-const extents: Extents = stable.extents();
-const rounded: number = pyRound(0.5);
-const nearest: number = findNearestColorIndex(0xff0000, getThreadSet());
+const command: Command = EmbConstant.STITCH;
+const stitch: Stitch = [0, 0, command];
+const blocks: StitchBlock[] = [...fromSvg.getAsStitchblock()];
+const extents: Extents = fromSvg.extents();
 
-void [
-  svg1,
-  svg2,
-  svg3,
-  svg4,
-  pes1,
-  parsedSvg,
-  pes2,
-  pes3,
-  stitch,
-  extents,
-  rounded,
-  nearest,
-];
+// @ts-expect-error unknown settings are rejected
+writePes(pattern, { maxStitch: 10 });
+// @ts-expect-error unknown settings are rejected
+readSvg("<svg/>", { spacing: 1 });
+
+void [svg, preview, converted, stitch, blocks, extents];

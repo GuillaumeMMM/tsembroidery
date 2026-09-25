@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { EmbThread, findNearestColorIndex } from "../src/index.ts";
+import { EmbThread, findNearestColorIndex } from "./internal.ts";
 
 test("setColor forces the 0xFF alpha byte", () => {
   const t = new EmbThread();

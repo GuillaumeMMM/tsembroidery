@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { getThreadSet } from "../src/index.ts";
+import { getThreadSet } from "./internal.ts";
 
 test("PEC chart has 65 entries (indices 0-64)", () => {
   const set = getThreadSet();
