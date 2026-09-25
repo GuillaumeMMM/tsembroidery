@@ -1,6 +1,6 @@
 {
   "name": "@guillaumemmm/tsembroidery",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Read and write Brother .pes and Tajima .dst embroidery files, render them as SVG, and turn flat SVG artwork into stitches.",
   "keywords": [
     "embroidery",
