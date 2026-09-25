@@ -155,6 +155,19 @@ export class EmbPattern {
     this.stitches.push([x, y, cmd]);
   }
 
+  /** Inserts a command relative to the stitch before `position`. */
+  insertStitchRelative(position: number, cmd: Command | number, dx = 0, dy = 0): void {
+    if (position < 0) position += this.stitches.length;
+    if (position === 0) {
+      this.stitches.unshift([dx, dy, cmd]);
+    } else if (position === this.stitches.length) {
+      this.addStitchRelative(cmd, dx, dy);
+    } else if (position > 0 && position < this.stitches.length) {
+      const [x, y] = this.stitches[position - 1];
+      this.stitches.splice(position, 0, [x + dx, y + dy, cmd]);
+    }
+  }
+
   addStitchblock(stitchblock: StitchBlock): void {
     const threadlist = this.threadlist;
     const block = stitchblock[0];
@@ -328,6 +341,69 @@ export class EmbPattern {
     }
     while (this.threadlist.length < threadIndex) {
       this.addThread(this.getThreadOrFiller(this.threadlist.length));
+    }
+  }
+
+  /**
+   * Adds a TRIM before runs of `jumpsToRequireTrim` jumps, or of jumps going further than
+   * `distanceToRequireTrim`, and drops runs of jumps that end where they started (with `clipping`).
+   * Formats without a trim command (like DST) encode trims this way.
+   */
+  interpolateTrims(
+    jumpsToRequireTrim: number | null = null,
+    distanceToRequireTrim: number | null = null,
+    clipping = true
+  ): void {
+    let i = -1;
+    let ie = this.stitches.length - 1;
+    let x = 0;
+    let y = 0;
+    let jumpCount = 0;
+    let jumpStart = 0;
+    let jumpDx = 0;
+    let jumpDy = 0;
+    let jumping = false;
+    let trimmed = true;
+    while (i < ie) {
+      i += 1;
+      const stitch = this.stitches[i];
+      const dx = stitch[0] - x;
+      const dy = stitch[1] - y;
+      [x, y] = stitch;
+      const command = stitch[2] & EmbConstant.COMMAND_MASK;
+      if (command === EmbConstant.STITCH || command === EmbConstant.SEQUIN_EJECT) {
+        trimmed = false;
+        jumping = false;
+      } else if (command === EmbConstant.COLOR_CHANGE || command === EmbConstant.TRIM) {
+        trimmed = true;
+        jumping = false;
+      }
+      if (command !== EmbConstant.JUMP) continue;
+      if (!jumping) {
+        [jumpDx, jumpDy, jumpCount, jumpStart] = [0, 0, 0, i];
+        jumping = true;
+      }
+      jumpCount += 1;
+      jumpDx += dx;
+      jumpDy += dy;
+      if (
+        !trimmed &&
+        (jumpCount === jumpsToRequireTrim ||
+          (distanceToRequireTrim !== null &&
+            (Math.abs(jumpDy) > distanceToRequireTrim || Math.abs(jumpDx) > distanceToRequireTrim)))
+      ) {
+        this.insertStitchRelative(jumpStart, EmbConstant.TRIM);
+        jumpStart += 1;
+        i += 1;
+        ie += 1;
+        trimmed = true;
+      }
+      if (clipping && jumpDx === 0 && jumpDy === 0) {
+        // The jumps went nowhere: drop them, keeping any trim added before them.
+        this.stitches.splice(jumpStart, i + 1 - jumpStart);
+        i = jumpStart - 1;
+        ie = this.stitches.length - 1;
+      }
     }
   }
 

@@ -12,7 +12,6 @@ import {
   oriented,
   type Matrix,
 } from "./matrix.js";
-import { pyRound } from "./pyMath.js";
 
 const {
   NO_COMMAND,
@@ -654,7 +653,7 @@ export class Transcoder {
       for (let q = 1; q < steps; q++) {
         qx += stepSizeX;
         qy += stepSizeY;
-        const stitch: Stitch = [pyRound(qx), pyRound(qy), data];
+        const stitch: Stitch = [qx, qy, data];
         transcode.push(stitch);
         this.updateNeedlePosition(stitch[0], stitch[1]);
       }

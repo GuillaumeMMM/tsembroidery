@@ -1,7 +1,8 @@
 // Compiled by `npm run typecheck` against the published declarations in dist/.
-import { EmbConstant, EmbPattern, EmbThread, pesToSvg, readPes, readSvg, svgToPes, writePes, writeSvg } from "../dist/index.js";
+import { EmbConstant, EmbPattern, EmbThread, pesToSvg, readDst, readPes, readSvg, svgToPes, writeDst, writePes, writeSvg } from "../dist/index.js";
 import type {
   Command,
+  DstWriteSettings,
   EncoderSettings,
   Extents,
   PesWriteSettings,
@@ -24,6 +25,10 @@ const encoderSettings: EncoderSettings = { max_stitch: 100, tie_on: true, transl
 const normalized: EmbPattern = pattern.getNormalizedPattern(encoderSettings);
 const pesSettings: PesWriteSettings = { version: 1, encode: true, max_jump: 2047 };
 const pes: Uint8Array = writePes(pattern, pesSettings);
+
+const dstSettings: DstWriteSettings = { extendedHeader: true, max_stitch: 100 };
+const dst: Uint8Array = writeDst(readSvg("<svg/>"), dstSettings);
+const fromDst: EmbPattern = readDst(dst);
 
 const svgWriteSettings: SvgWriteSettings = { stable: false };
 const svg: string = writeSvg(normalized, svgWriteSettings);
@@ -53,4 +58,4 @@ writePes(pattern, { maxStitch: 10 });
 // @ts-expect-error unknown settings are rejected
 readSvg("<svg/>", { spacing: 1 });
 
-void [svg, preview, converted, stitch, blocks, extents];
+void [svg, preview, converted, stitch, blocks, extents, fromDst];

@@ -220,7 +220,7 @@ test("first stitch jumps only within range: no JUMP unless full_jump", () => {
   ]);
 });
 
-test("JUMP command interpolates by max_jump with python round()", () => {
+test("JUMP command is split into equal steps of at most max_jump", () => {
   const dest = transcode(
     [
       [10, 0, C.JUMP],
@@ -228,10 +228,11 @@ test("JUMP command interpolates by max_jump with python round()", () => {
     ],
     { max_jump: 3 }
   );
+  // As in pyembroidery 1.5: exact positions, rounded by each writer when it encodes moves.
   expect(dest.stitches).toStrictEqual([
-    [2, 0, C.JUMP],
+    [2.5, 0, C.JUMP],
     [5, 0, C.JUMP],
-    [8, 0, C.JUMP],
+    [7.5, 0, C.JUMP],
     [10, 0, C.JUMP],
     [10, 0, C.END],
   ]);
@@ -253,7 +254,7 @@ test("long stitch with default JUMP_NEEDLE contingency splits into JUMPs", () =>
   ]);
 });
 
-test("interpolate uses python round(): 0.5 rounds to even (0), not 1", () => {
+test("interpolated gap points keep exact positions", () => {
   const dest = transcode(
     [
       [0, 0, C.STITCH],
@@ -263,7 +264,7 @@ test("interpolate uses python round(): 0.5 rounds to even (0), not 1", () => {
   );
   expect(dest.stitches).toStrictEqual([
     [0, 0, C.STITCH],
-    [0, 0, C.JUMP],
+    [0.5, 0, C.JUMP],
     [1, 0, C.STITCH],
     [1, 0, C.END],
   ]);

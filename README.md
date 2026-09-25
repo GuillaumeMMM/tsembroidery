@@ -1,8 +1,8 @@
 # tsembroidery
 
-Read and write Brother `.pes` embroidery files, and turn SVG files into `.pes` files. Based on [pyembroidery](https://github.com/EmbroidePy/pyembroidery), with the additional `.svg -> .pes`.
+Read and write Brother `.pes` and Tajima `.dst` embroidery files, and turn SVG files into `.pes` or `.dst` files. Based on [pyembroidery](https://github.com/EmbroidePy/pyembroidery), with the additional `.svg -> .pes` & `.svg -> .dst`.
 
-For now, only `.pes` has been ported from pyembroidery.
+For now, only `.pes` and `.dst` were ported from pyembroidery.
 
 ```sh
 npm install @guillaumemmm/tsembroidery
@@ -35,6 +35,8 @@ Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in t
 | -------------------------------------------------------------------- | ------------ | ----------------------------------------------------------- |
 | `readPes(bytes: Uint8Array)`                                         | `EmbPattern` | Parses a `.pes` file.                                       |
 | `writePes(pattern: EmbPattern, settings?: PesWriteSettings)`         | `Uint8Array` | Encodes a pattern as a `.pes` file.                         |
+| `readDst(bytes: Uint8Array)`                                         | `EmbPattern` | Parses a Tajima `.dst` file.                                |
+| `writeDst(pattern: EmbPattern, settings?: DstWriteSettings)`         | `Uint8Array` | Encodes a pattern as a `.dst` file.                         |
 | `pesToSvg(bytes: Uint8Array, settings?: SvgWriteSettings)`           | `string`     | Renders a `.pes` file as SVG.                               |
 | `writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings)`         | `string`     | Renders a pattern as SVG, one path per run of stitches.     |
 | `readSvg(input: string \| Uint8Array, settings?: SvgReadSettings)`   | `EmbPattern` | Turns SVG artwork into stitches.                            |
@@ -56,7 +58,7 @@ Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in t
 
 ### Writing settings
 
-`writePes` takes `version` (`6` by default, which keeps exact thread colors and metadata, or `1`).
+`writePes` takes `version` (`6` by default, which keeps exact thread colors and metadata, or `1`). `writeDst` takes `extendedHeader` (`false` by default): DST stores no thread colors, so the machine just stops between colors, unless the extended header lists them.
 
 ## License
 
