@@ -19,12 +19,19 @@ import {
   readPec,
   readPes,
   readPesInto,
+  readSvg,
+  svgToPes,
+  writePes,
   writeSvg,
 } from "../dist/index.js";
 import type {
   Extents,
+  PesSettings,
   Stitch,
+  SvgInput,
+  SvgReadSettings,
   SvgSettings,
+  SvgToPesSettings,
   TranscoderSettings,
 } from "../dist/index.js";
 
@@ -65,6 +72,17 @@ const svg3: string = pesToSvg(new Uint8Array(), {
 });
 const svg4: string = pesToSvg(new Uint8Array(), { stable: false });
 
+/* -------------------------------- PES ---------------------------------- */
+
+const pesSettings: PesSettings = { version: 6, encode: true, max_stitch: 2047 };
+const svgInput: SvgInput = new TextEncoder().encode("<svg></svg>");
+const svgReadSettings: SvgReadSettings = { units: "mm" };
+const svgToPesSettings: SvgToPesSettings = { version: 1, units: "mm" };
+const pes1: Uint8Array = writePes(pattern, pesSettings);
+const parsedSvg: EmbPattern = readSvg(svgInput, svgReadSettings);
+const pes2: Uint8Array = svgToPes("<svg></svg>", svgToPesSettings);
+const pes3: Uint8Array = svgToPes(svgInput, { version: 6 });
+
 /* ------------------------------ primitives ------------------------------ */
 
 const stitch: Stitch = [0, 0, EmbConstant.STITCH];
@@ -72,4 +90,17 @@ const extents: Extents = stable.extents();
 const rounded: number = pyRound(0.5);
 const nearest: number = findNearestColorIndex(0xff0000, getThreadSet());
 
-void [svg1, svg2, svg3, svg4, stitch, extents, rounded, nearest];
+void [
+  svg1,
+  svg2,
+  svg3,
+  svg4,
+  pes1,
+  parsedSvg,
+  pes2,
+  pes3,
+  stitch,
+  extents,
+  rounded,
+  nearest,
+];

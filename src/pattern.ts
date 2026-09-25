@@ -12,11 +12,27 @@
  *    of a random one (decision: deterministic filler). It must stay a new
  *    instance so identity comparisons against `threadlist` keep behaving
  *    like python's random fillers (always unequal -> COLOR_CHANGE).
+ *  - duplicate color-change conversion uses value equality because PES v6
+ *    reconstructs equivalent thread records as separate objects.
  */
 import { EmbConstant, type Command } from "./constants.js";
 import { EmbThread } from "./thread.js";
 import { pyRound } from "./pyMath.js";
 import { Transcoder, type TranscoderSettings } from "./encoder.js";
+
+/** Match pyembroidery's value-based EmbThread equality for color changes. */
+function sameThread(a: EmbThread, b: EmbThread): boolean {
+  return (
+    a === b ||
+    ((a.color & 0xffffff) === (b.color & 0xffffff) &&
+      a.description === b.description &&
+      a.catalog_number === b.catalog_number &&
+      a.details === b.details &&
+      a.brand === b.brand &&
+      a.chart === b.chart &&
+      a.weight === b.weight)
+  );
+}
 
 /** Raw stitch record: absolute x, absolute y, command. */
 export type Stitch = [number, number, Command | number];
@@ -425,7 +441,7 @@ export class EmbPattern {
     this.stitches = tempPattern.stitches;
   }
 
-  /** Converts color change to the SAME thread object into a STOP. */
+  /** Converts a color change to the same thread value into a STOP. */
   convertDuplicateColorChangeToStop(): void {
     const newPattern = new EmbPattern();
     newPattern.addThread(this.getThreadOrFiller(0));
@@ -440,7 +456,7 @@ export class EmbPattern {
         const thread = this.getThreadOrFiller(threadIndex);
         const last =
           newPattern.threadlist[newPattern.threadlist.length - 1];
-        if (thread === last) {
+        if (sameThread(thread, last)) {
           newPattern.stop();
         } else {
           newPattern.colorChange();

@@ -1,7 +1,7 @@
 /**
  * tsembroidery — TypeScript port of the parts of pyembroidery
- * (https://github.com/EmbroidePy/pyembroidery) needed to read Brother
- * .pes embroidery files and write SVG.
+ * (https://github.com/EmbroidePy/pyembroidery) needed to read and write
+ * Brother .pes embroidery files and write SVG.
  */
 export { EmbConstant } from "./constants.js";
 export type { Command } from "./constants.js";
@@ -38,12 +38,20 @@ export type { Matrix } from "./matrix.js";
 
 export { readPec } from "./readers/pec.js";
 export { readPes, readPesInto } from "./readers/pes.js";
+export { readSvg } from "./readers/svg.js";
+export type {
+  SvgInput,
+  SvgReadSettings,
+} from "./readers/svg.js";
 
 export { Transcoder } from "./encoder.js";
 export type { TranscoderSettings, PointLike } from "./encoder.js";
 
 export { writeSvg, pesToSvg } from "./writeSvg.js";
 export type { SvgSettings } from "./writeSvg.js";
+
+export { writePes, svgToPes } from "./writePes.js";
+export type { PesSettings, SvgToPesSettings } from "./writePes.js";
 
 export {
   ByteReader,

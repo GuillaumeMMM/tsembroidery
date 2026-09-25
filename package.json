@@ -1,7 +1,7 @@
 {
   "name": "@guillaumemmm/tsembroidery",
   "version": "2.0.0",
-  "description": "Read Brother .pes embroidery files and render them as SVG.",
+  "description": "Read and write Brother .pes embroidery files and render them as SVG.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
