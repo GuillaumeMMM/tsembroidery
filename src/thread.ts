@@ -1,10 +1,4 @@
-/**
- * Port of pyembroidery `EmbThread.py`.
- *
- * Color storage matches python: `set_color` forces the 0xFF000000 alpha
- * byte, while `set_hex_color("#rrggbb")` stores the bare 24-bit value.
- * Getters always mask to 8 bits so the alpha presence doesn't matter.
- */
+/** Port of pyembroidery's EmbThread. */
 import { pyRound } from "./pyMath.js";
 
 export type ColorSource = number | EmbThread;
@@ -17,7 +11,6 @@ function colorDistanceRedMean(
   g2: number,
   b2: number,
 ): number {
-  // python: red_mean = int(round((r1 + r2) / 2))
   const redMean = pyRound((r1 + r2) / 2);
   const r = r1 - r2;
   const g = g1 - g2;
@@ -27,15 +20,9 @@ function colorDistanceRedMean(
     4 * g * g +
     (((767 - redMean) * b * b) >> 8)
   );
-  // See the very good color distance paper:
-  // https://www.compuphase.com/cmetric.htm
 }
 
-/**
- * Finds the index of the thread in `values` closest to `find_color`.
- * `null` entries are skipped. Ties resolve to the LAST match
- * (python uses `<=`).
- */
+/** Skips null entries; ties go to the last match. */
 export function findNearestColorIndex(
   findColor: ColorSource,
   values: (EmbThread | null)[],
@@ -59,7 +46,6 @@ export function findNearestColorIndex(
       t.getBlue(),
     );
     if (dist <= currentClosestValue) {
-      // <= choose second if they tie.
       currentClosestValue = dist;
       closestIndex = currentIndex;
     }
@@ -101,21 +87,12 @@ export class EmbThread {
     return findNearestColorIndex(this.color, values);
   }
 
-  /** python `hex_color()`: `"#%02x%02x%02x"` — includes the leading `#`. */
   hexColor(): string {
     const hex = (n: number) => n.toString(16).padStart(2, "0");
     return `#${hex(this.getRed())}${hex(this.getGreen())}${hex(this.getBlue())}`;
   }
 
-  /**
-   * python `set_hex_color`: strips `#`, accepts 6/8 (first 6 used) or
-   * 4/3 (expanded) digit strings.
-   *
-   * PY-BUG: python expands 3/4-digit input as `h[2]+h[2]+h[1]+h[1]+h[0]+h[0]`,
-   * which doubles the digits in REVERSE order — `setHexColor("#abc")`
-   * yields rgb(cc,bb,aa) instead of rgb(aa,bb,cc). Presumed intent is the
-   * CSS expansion, so this is fixed here (doubles in forward order).
-   */
+  // pyembroidery reverses 3-digit hex (#abc -> #ccbbaa); this expands it the CSS way.
   setHexColor(hexString: string): void {
     const h = hexString.replace(/^#+/, "");
     const size = h.length;

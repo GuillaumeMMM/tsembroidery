@@ -28,7 +28,7 @@ test("hexColor includes '#' and is zero-padded", () => {
 
 test("hexColor works when color has no alpha byte", () => {
   const t = new EmbThread();
-  t.color = 0x000abc; // set_hex_color stores bare 24-bit value
+  t.color = 0x000abc;
   expect(t.hexColor()).toBe("#000abc");
 });
 
@@ -43,7 +43,6 @@ test("setHexColor strips leading #", () => {
   const t = new EmbThread();
   t.setHexColor("#abcdef");
   expect(t.color).toBe(0xabcdef);
-  // multiple '#' like python lstrip('#')
   const t2 = new EmbThread();
   t2.setHexColor("##aabbcc");
   expect(t2.color).toBe(0xaabbcc);
@@ -56,8 +55,6 @@ test("setHexColor with 8 digits uses the first 6", () => {
 });
 
 test("setHexColor with 3 digits expands forward (PY-BUG fixed)", () => {
-  // python reverses the digits: "#abc" -> rgb(cc,bb,aa). Fixed to CSS
-  // semantics: "#abc" -> rgb(aa,bb,cc).
   const t = new EmbThread();
   t.setHexColor("#abc");
   expect(t.getRed()).toBe(0xaa);
@@ -90,7 +87,6 @@ test("findNearestColorIndex skips null entries", () => {
 });
 
 test("findNearestColorIndex tie resolves to the later index", () => {
-  // python uses `<=`, so an exact tie keeps the LAST match.
   const a = new EmbThread();
   a.setColor(0, 0, 0);
   const b = new EmbThread();
@@ -111,8 +107,6 @@ test("findNearestColorIndex picks perceptually nearer color (red-mean)", () => {
   dark.setColor(10, 10, 10);
   const bright = new EmbThread();
   bright.setColor(240, 0, 0);
-  // A dark red should be closer to dark gray than to bright red? No —
-  // red-mean weights red: check the actual nearest to (180, 0, 0).
   const target = new EmbThread();
   target.setColor(180, 0, 0);
   expect(target.findNearestColorIndex([dark, bright])).toBe(1);

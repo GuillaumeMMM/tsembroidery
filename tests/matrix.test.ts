@@ -45,9 +45,6 @@ test("getRotate 360 is identity (approx)", () => {
 });
 
 test("matrixMultiply: python settings order (translate then scale)", () => {
-  // python builds: matrix = I; matrix = multiply(matrix, translate);
-  // matrix = multiply(matrix, scale). Row-vector convention: p*(A*B)
-  // applies A first, then B -> translate (0,0)->(10,10), scale ->(20,20).
   let m = getIdentity();
   m = matrixMultiply(m, getTranslate(10, 10));
   m = matrixMultiply(m, getScale(2, 2));
@@ -63,7 +60,7 @@ test("matrixMultiply: identity is neutral on both sides", () => {
 test("pointInMatrixSpace carries a 3rd element through", () => {
   const m = matrixMultiply(getTranslate(1, 1), getRotate(0));
   const out = pointInMatrixSpace(m, [10, 20, 42] as any);
-  expect(out).toStrictEqual([11, 21, 42]); // command survives transform
+  expect(out).toStrictEqual([11, 21, 42]);
 });
 
 test("pointInMatrixSpace on a 2-element vector returns 2 elements", () => {

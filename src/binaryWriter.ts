@@ -1,11 +1,11 @@
-/** Small growable binary writer used by the format serializers. */
 export class ByteWriter {
   private bytes = new Uint8Array(1024);
   private view = new DataView(this.bytes.buffer);
   private offset = 0;
+  private end = 0;
 
   get length(): number {
-    return this.offset;
+    return this.end;
   }
 
   tell(): number {
@@ -63,10 +63,11 @@ export class ByteWriter {
   }
 
   toUint8Array(): Uint8Array {
-    return this.bytes.slice(0, this.offset);
+    return this.bytes.slice(0, this.end);
   }
 
   private ensure(size: number): void {
+    this.end = Math.max(this.end, size);
     if (size <= this.bytes.length) return;
     let capacity = this.bytes.length;
     while (capacity < size) capacity *= 2;

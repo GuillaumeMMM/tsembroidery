@@ -29,8 +29,6 @@ function transcode(
 
 const cmds = (p: EmbPattern) => p.stitches.map((s) => s[2]);
 
-/* ------------------------------- settings ----------------------------- */
-
 test("Transcoder settings defaults (python __init__)", () => {
   const t = new Transcoder();
   expect(t.maxStitch).toBe(Infinity);
@@ -43,7 +41,6 @@ test("Transcoder settings defaults (python __init__)", () => {
   expect(t.hasTieOff).toBe(false);
   expect(t.longStitchContingency).toBe(C.CONTINGENCY_JUMP_NEEDLE);
   expect(t.matrix).toStrictEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
-  // initial state machine values
   expect(t.sourcePattern).toBe(null);
   expect(t.destinationPattern).toBe(null);
   expect(t.position).toBe(0);
@@ -57,14 +54,12 @@ test("Transcoder settings defaults (python __init__)", () => {
 });
 
 test("strip_sequins picks the initial sequin contingency, explicit setting wins", () => {
-  // strip_sequins True (default) -> UTILIZE, False -> JUMP
   expect(new Transcoder().sequinContingency).toBe(
     C.CONTINGENCY_SEQUIN_UTILIZE
   );
   expect(new Transcoder({ strip_sequins: false }).sequinContingency).toBe(
     C.CONTINGENCY_SEQUIN_JUMP
   );
-  // sequin_contingency setting overrides either
   expect(
     new Transcoder({
       strip_sequins: false,
@@ -108,8 +103,6 @@ test("translate setting: array and {x, y} forms compose the matrix", () => {
 });
 
 test("translate setting: short array falls through (python IndexError -> .x -> pass)", () => {
-  // python: translate[1] raises IndexError -> tries translate.x ->
-  // AttributeError -> pass. An array has no .x, so nothing is applied.
   const t = new Transcoder({ translate: [10] });
   expect(pointInMatrixSpace(t.matrix, 0, 0)).toStrictEqual([0, 0]);
 });
@@ -124,8 +117,6 @@ test("scale setting: scalar is uniform, array is per-axis, {x, y} works", () => 
 });
 
 test("settings matrix order: translate applied before scale", () => {
-  // python: matrix = I; matrix = multiply(matrix, translate); matrix =
-  // multiply(matrix, scale). Row vectors: p*(T*S) applies T first.
   const t = new Transcoder({ translate: [10, 10], scale: 2 });
   expect(pointInMatrixSpace(t.matrix, 0, 0)).toStrictEqual([20, 20]);
 });
@@ -138,19 +129,11 @@ test("rotate setting rotates by degrees after translate", () => {
 });
 
 test("invalid transform settings restate python's TypeError", () => {
-  // python: `translate[0]` on a scalar raises TypeError, and
-  // `except IndexError` does NOT catch it -> constructor crashes.
   expect(() => new Transcoder({ translate: 5 })).toThrow(TypeError);
-  // python: scale [2] -> IndexError -> .x AttributeError ->
-  // get_scale([2], [2]) feeds the list into matrix math -> TypeError.
   expect(() => new Transcoder({ scale: [2] })).toThrow(TypeError);
-  // python: get_rotate does `theta *= tau / 360` -> TypeError on a string.
-  // @ts-expect-error the string rotate is the deliberately invalid input
-  // being tested (restated python TypeError).
+  // @ts-expect-error invalid on purpose
   expect(() => new Transcoder({ rotate: "90" })).toThrow(TypeError);
 });
-
-/* ------------------------------- transcode ---------------------------- */
 
 test("transcode copies metadata and threads, returns destination", () => {
   const source = buildSource([
@@ -164,19 +147,18 @@ test("transcode copies metadata and threads, returns destination", () => {
   source.metadata("version", 6);
 
   const destination = new EmbPattern();
-  destination.metadata("name", "old"); // must be overwritten by source
-  destination.metadata("existing", true); // must survive
+  destination.metadata("name", "old");
+  destination.metadata("existing", true);
 
   const t = new Transcoder();
   const returned = t.transcode(source, destination);
 
   expect(returned).toBe(destination);
   expect(destination.threadlist.length).toBe(1);
-  expect(destination.threadlist[0]).toBe(thread); // same instance
+  expect(destination.threadlist[0]).toBe(thread);
   expect(destination.getMetadata("name")).toBe("Flowers");
   expect(destination.getMetadata("version")).toBe(6);
   expect(destination.getMetadata("existing")).toBe(true);
-  // first stitch declared the color index (-1 -> 0)
   expect(t.colorIndex).toBe(0);
   expect(destination.stitches).toStrictEqual([
     [0, 0, C.STITCH],
@@ -196,7 +178,7 @@ test("transcode: simple stitch stream, END emitted at the needle", () => {
     [0, 0, C.STITCH],
     [10, 0, C.STITCH],
     [0, 10, C.STITCH],
-    [0, 10, C.END], // add(END) uses the needle, not the source coords
+    [0, 10, C.END],
   ]);
   expect(cmds(dest).filter((c) => c === C.END).length).toBe(1);
 });
@@ -210,8 +192,6 @@ test("transcode: source without END gets a trailing END", () => {
 });
 
 test("transcode: empty source still ends with END at (0,0)", () => {
-  // python: `flags = NO_COMMAND` before the loop; loop never runs ->
-  // flags != END -> end_here().
   const dest = transcode([]);
   expect(dest.stitches).toStrictEqual([[0, 0, C.END]]);
 });
@@ -227,8 +207,6 @@ test("transcode: NO_COMMAND stitches are skipped", () => {
   ]);
 });
 
-/* -------------------------- movement / lengths ------------------------ */
-
 test("first stitch jumps only within range: no JUMP unless full_jump", () => {
   const plain = transcode([[10, 0, C.STITCH]]);
   expect(cmds(plain)).toStrictEqual([C.STITCH, C.END]);
@@ -242,9 +220,6 @@ test("first stitch jumps only within range: no JUMP unless full_jump", () => {
 });
 
 test("JUMP command interpolates by max_jump with python round()", () => {
-  // distance 10, max_jump 3 -> steps=ceil(10/3)=4, step=2.5 ->
-  // intermediates at round(2.5)=2, round(5)=5, round(7.5)=8 (half-to-even!
-  // Math.round would give 3, 5, 8), then jump_at lands on the target.
   const dest = transcode(
     [
       [10, 0, C.JUMP],
@@ -262,8 +237,6 @@ test("JUMP command interpolates by max_jump with python round()", () => {
 });
 
 test("long stitch with default JUMP_NEEDLE contingency splits into JUMPs", () => {
-  // First stitch is governed by max_jump only (still inf -> whole).
-  // Second stitch: needle_to interpolates with JUMP data by max_stitch.
   const dest = transcode(
     [
       [0, 0, C.STITCH],
@@ -280,7 +253,6 @@ test("long stitch with default JUMP_NEEDLE contingency splits into JUMPs", () =>
 });
 
 test("interpolate uses python round(): 0.5 rounds to even (0), not 1", () => {
-  // distance 1, max_stitch 0.6 -> steps=2, step=0.5 -> round(0.5)=0
   const dest = transcode(
     [
       [0, 0, C.STITCH],
@@ -290,7 +262,7 @@ test("interpolate uses python round(): 0.5 rounds to even (0), not 1", () => {
   );
   expect(dest.stitches).toStrictEqual([
     [0, 0, C.STITCH],
-    [0, 0, C.JUMP], // Math.round(0.5) would have produced [1, 0, JUMP]
+    [0, 0, C.JUMP],
     [1, 0, C.STITCH],
     [1, 0, C.END],
   ]);
@@ -308,7 +280,6 @@ test("long_stitch_contingency CONTINGENCY_NONE keeps the long stitch", () => {
 });
 
 test("on-the-fly CONTINGENCY_NONE / CONTINGENCY_SEW_TO commands", () => {
-  // NONE: no split at all
   const none = transcode(
     [
       [0, 0, C.STITCH],
@@ -319,7 +290,6 @@ test("on-the-fly CONTINGENCY_NONE / CONTINGENCY_SEW_TO commands", () => {
   );
   expect(cmds(none)).toStrictEqual([C.STITCH, C.STITCH, C.END]);
 
-  // SEW_TO: gap stitches are STITCH data, not JUMP
   const sew = transcode(
     [
       [0, 0, C.STITCH],
@@ -340,7 +310,7 @@ test("STITCH_BREAK sets jumping: following JUMP dropped, STITCH needle_to's", ()
   const dest = transcode([
     [0, 0, C.STITCH],
     [5, 0, C.STITCH_BREAK],
-    [10, 0, C.JUMP], // state_jumping -> python skips the jump entirely
+    [10, 0, C.JUMP],
     [15, 0, C.STITCH],
   ]);
   expect(dest.stitches).toStrictEqual([
@@ -354,7 +324,6 @@ test("NEEDLE_AT: first stitch lands whole, mid-run always needle_to", () => {
   const first = transcode([[10, 0, C.NEEDLE_AT]]);
   expect(cmds(first)).toStrictEqual([C.STITCH, C.END]);
 
-  // Even with CONTINGENCY_SEW_TO, NEEDLE_AT interpolates with JUMP data.
   const mid = transcode(
     [
       [0, 0, C.STITCH],
@@ -400,8 +369,6 @@ test("SEW_TO always sews (STITCH interpolation); while jumping it needle_to's", 
     [10, 0, C.END],
   ]);
 });
-
-/* ---------------------------- middle-level ---------------------------- */
 
 test("COLOR_BREAK before any stitching is ignored (color_index < 0)", () => {
   const dest = transcode([
@@ -498,12 +465,7 @@ test("SEQUENCE_BREAK trims at most once", () => {
   expect(twice.countStitchCommands(C.TRIM)).toBe(1);
 });
 
-/* --------------------------------- ties -------------------------------- */
-
 test("tie_off at position 0 uses python's negative index (wraps to LAST)", () => {
-  // python: source_pattern.stitches[position - 1] with position 0 is
-  // stitches[-1] -> the LAST stitch. Here that is [5, 5, STITCH], so the
-  // lock stitches walk from the needle (0,0) toward (5,5).
   const t = new Transcoder();
   const destination = new EmbPattern();
   const source = buildSource([
@@ -546,7 +508,6 @@ test("TIE_ON command past the end of source is skipped (python IndexError)", () 
 });
 
 test("lock_stitch clamps the anchor with oriented() when over max_stitch", () => {
-  // needle (0,0), anchor (100,0), max_stitch 10 -> anchor becomes (10,0)
   const dest = transcode(
     [
       [0, 0, C.TIE_OFF],
@@ -559,8 +520,6 @@ test("lock_stitch clamps the anchor with oriented() when over max_stitch", () =>
     [towards(0, 10, 0.66), 0, C.STITCH],
     [towards(0, 10, 0.33), 0, C.STITCH],
     [towards(0, 10, 0), 0, C.STITCH],
-    // NB: the first source stitch is governed by max_JUMP (still inf),
-    // so max_stitch does not split it — only the lock clamped.
     [100, 0, C.STITCH],
     [100, 0, C.END],
   ]);
@@ -578,7 +537,7 @@ test("lock_stitch: keeps floats, does not move the needle or the state", () => {
   ]);
   expect(t.needleX).toBe(0);
   expect(t.needleY).toBe(0);
-  expect(t.stateTrimmed).toBe(true); // lock_stitch never declares
+  expect(t.stateTrimmed).toBe(true);
 });
 
 test("OPTION_ENABLE_TIE_ON / OPTION_DISABLE_TIE_ON toggle mid-stream", () => {
@@ -586,11 +545,11 @@ test("OPTION_ENABLE_TIE_ON / OPTION_DISABLE_TIE_ON toggle mid-stream", () => {
     [0, 0, C.STITCH],
     [5, 5, C.TRIM],
     [0, 0, C.OPTION_ENABLE_TIE_ON],
-    [10, 0, C.STITCH], // -> tie on toward source[4] (20,0)
+    [10, 0, C.STITCH],
     [20, 0, C.STITCH],
     [25, 0, C.TRIM],
     [0, 0, C.OPTION_DISABLE_TIE_ON],
-    [30, 0, C.STITCH], // -> NO tie (disabled)
+    [30, 0, C.STITCH],
     [40, 0, C.STITCH],
   ]);
   expect(dest.stitches).toStrictEqual([
@@ -614,10 +573,10 @@ test("OPTION_ENABLE_TIE_OFF / OPTION_DISABLE_TIE_OFF toggle mid-stream", () => {
     [0, 0, C.STITCH],
     [0, 0, C.OPTION_ENABLE_TIE_OFF],
     [5, 5, C.STITCH],
-    [10, 10, C.TRIM], // -> tie off toward source[2] == needle -> 4 locks in place
+    [10, 10, C.TRIM],
     [0, 0, C.OPTION_DISABLE_TIE_OFF],
     [20, 20, C.STITCH],
-    [30, 30, C.TRIM], // -> NO locks
+    [30, 30, C.TRIM],
   ]);
   expect(dest.stitches).toStrictEqual([
     [0, 0, C.STITCH],
@@ -631,7 +590,6 @@ test("OPTION_ENABLE_TIE_OFF / OPTION_DISABLE_TIE_OFF toggle mid-stream", () => {
     [20, 20, C.TRIM],
     [20, 20, C.END],
   ]);
-  // 1 + 1 + 4 locks = 6 STITCH commands before the first TRIM
   const firstTrim = dest.stitches.findIndex((s) => s[2] === C.TRIM);
   expect(firstTrim).toBe(6);
 });
@@ -646,16 +604,15 @@ test("lookahead_stitch finds stitching ahead, stops at END", () => {
   const t = new Transcoder();
   t.sourcePattern = source;
   t.position = 0;
-  expect(t.lookaheadStitch()).toBe(true); // finds TIE_ON
+  expect(t.lookaheadStitch()).toBe(true);
   t.position = 1;
-  expect(t.lookaheadStitch()).toBe(true); // TIE_ON itself counts
+  expect(t.lookaheadStitch()).toBe(true);
   t.position = 2;
-  expect(t.lookaheadStitch()).toBe(false); // END stops the search
+  expect(t.lookaheadStitch()).toBe(false);
   t.position = 3;
-  expect(t.lookaheadStitch()).toBe(true); // STITCH after END still visible? no:
-  // position 3 IS the stitch -> true (range starts at position)
+  expect(t.lookaheadStitch()).toBe(true);
   t.position = 4;
-  expect(t.lookaheadStitch()).toBe(false); // past the end
+  expect(t.lookaheadStitch()).toBe(false);
 
   const noStitching = buildSource([
     [0, 0, C.COLOR_CHANGE],
@@ -664,19 +621,19 @@ test("lookahead_stitch finds stitching ahead, stops at END", () => {
   ]);
   t.sourcePattern = noStitching;
   t.position = 0;
-  expect(t.lookaheadStitch()).toBe(false); // breaks don't count as stitching
+  expect(t.lookaheadStitch()).toBe(false);
 });
 
 test("OPTION_IMPLICIT_TRIM / OPTION_EXPLICIT_TRIM gate the COLOR_BREAK trim", () => {
   const dest = transcode([
     [0, 0, C.STITCH],
-    [5, 5, C.COLOR_BREAK], // explicit (default) -> TRIM + COLOR_CHANGE
+    [5, 5, C.COLOR_BREAK],
     [10, 10, C.STITCH],
     [0, 0, C.OPTION_IMPLICIT_TRIM],
-    [15, 15, C.COLOR_BREAK], // implicit -> COLOR_CHANGE only, no TRIM
+    [15, 15, C.COLOR_BREAK],
     [20, 20, C.STITCH],
     [0, 0, C.OPTION_EXPLICIT_TRIM],
-    [25, 25, C.COLOR_BREAK], // explicit again -> TRIM + COLOR_CHANGE
+    [25, 25, C.COLOR_BREAK],
     [30, 30, C.STITCH],
   ]);
   expect(dest.stitches).toStrictEqual([
@@ -684,7 +641,7 @@ test("OPTION_IMPLICIT_TRIM / OPTION_EXPLICIT_TRIM gate the COLOR_BREAK trim", ()
     [0, 0, C.TRIM],
     [0, 0, C.COLOR_CHANGE],
     [10, 10, C.STITCH],
-    [10, 10, C.COLOR_CHANGE], // <- no TRIM before this one
+    [10, 10, C.COLOR_CHANGE],
     [20, 20, C.STITCH],
     [20, 20, C.TRIM],
     [20, 20, C.COLOR_CHANGE],
@@ -693,11 +650,9 @@ test("OPTION_IMPLICIT_TRIM / OPTION_EXPLICIT_TRIM gate the COLOR_BREAK trim", ()
   ]);
 });
 
-/* --------------------------------- core -------------------------------- */
-
 test("TRIM: leading trim is a no-op, duplicate trims collapse", () => {
   const leading = transcode([[5, 5, C.TRIM]]);
-  expect(leading.stitches).toStrictEqual([[0, 0, C.END]]); // state starts trimmed
+  expect(leading.stitches).toStrictEqual([[0, 0, C.END]]);
 
   const dup = transcode([
     [0, 0, C.STITCH],
@@ -751,8 +706,6 @@ test("SLOW/FAST are stripped by default, kept with strip_speeds false", () => {
   ]);
 });
 
-/* -------------------------------- sequins ------------------------------ */
-
 test("SEQUIN_EJECT with UTILIZE: mode toggles on, eject lands", () => {
   const dest = transcode([
     [0, 0, C.STITCH],
@@ -760,7 +713,7 @@ test("SEQUIN_EJECT with UTILIZE: mode toggles on, eject lands", () => {
   ]);
   expect(dest.stitches).toStrictEqual([
     [0, 0, C.STITCH],
-    [0, 0, C.SEQUIN_MODE], // at the needle before the eject
+    [0, 0, C.SEQUIN_MODE],
     [5, 0, C.SEQUIN_EJECT],
     [5, 0, C.END],
   ]);
@@ -815,10 +768,9 @@ test("sequin_contingency REMOVE: eject dropped, needle NOT updated", () => {
     ],
     { sequin_contingency: C.CONTINGENCY_SEQUIN_REMOVE }
   );
-  // python: sequin_at returns early -> no needle update, no declare.
   expect(dest.stitches).toStrictEqual([
     [0, 0, C.STITCH],
-    [0, 0, C.END], // needle never left (0,0)
+    [0, 0, C.END],
   ]);
 });
 
@@ -853,9 +805,9 @@ test("TRIM while in sequin mode toggles the mode off first", () => {
   ]);
   expect(dest.stitches).toStrictEqual([
     [0, 0, C.STITCH],
-    [0, 0, C.SEQUIN_MODE], // on
+    [0, 0, C.SEQUIN_MODE],
     [5, 0, C.SEQUIN_EJECT],
-    [5, 0, C.SEQUIN_MODE], // off, before the trim
+    [5, 0, C.SEQUIN_MODE],
     [5, 0, C.TRIM],
     [5, 0, C.END],
   ]);
@@ -865,13 +817,13 @@ test("jump_at turns sequin mode off before jumping (in-range jump)", () => {
   const dest = transcode([
     [0, 0, C.STITCH],
     [5, 0, C.SEQUIN_EJECT],
-    [10, 0, C.JUMP], // gap within max_jump -> toggle happens in jump_at
+    [10, 0, C.JUMP],
   ]);
   expect(dest.stitches).toStrictEqual([
     [0, 0, C.STITCH],
     [0, 0, C.SEQUIN_MODE],
     [5, 0, C.SEQUIN_EJECT],
-    [5, 0, C.SEQUIN_MODE], // toggled off in jump_at
+    [5, 0, C.SEQUIN_MODE],
     [10, 0, C.JUMP],
     [10, 0, C.END],
   ]);
@@ -890,7 +842,7 @@ test("interpolating a long JUMP toggles sequin mode off first", () => {
     [0, 0, C.STITCH],
     [0, 0, C.SEQUIN_MODE],
     [5, 0, C.SEQUIN_EJECT],
-    [5, 0, C.SEQUIN_MODE], // toggled inside interpolate (gap exceeds max_jump)
+    [5, 0, C.SEQUIN_MODE],
     [10, 0, C.JUMP],
     [15, 0, C.JUMP],
     [20, 0, C.JUMP],
@@ -909,8 +861,8 @@ test("in-stream CONTINGENCY_SEQUIN_REMOVE turns the mode off, then drops ejects"
     [0, 0, C.STITCH],
     [0, 0, C.SEQUIN_MODE],
     [5, 0, C.SEQUIN_EJECT],
-    [5, 0, C.SEQUIN_MODE], // contingency command closes the mode...
-    [5, 0, C.END], // ...and the next eject is dropped (needle unmoved)
+    [5, 0, C.SEQUIN_MODE],
+    [5, 0, C.END],
   ]);
 });
 
@@ -924,18 +876,11 @@ test("in-stream CONTINGENCY_SEQUIN_JUMP sets JUMP — PY-BUG fixed", () => {
     ]),
     destination
   );
-  // PY-BUG: python's branch reads
-  //     elif flags == CONTINGENCY_SEQUIN_JUMP:
-  //         ...
-  //         self.sequin_contingency = CONTINGENCY_SEQUIN_REMOVE
-  // (copy-paste from the CONTINGENCY_SEQUIN_REMOVE branch above it).
-  // The branch handles CONTINGENCY_SEQUIN_JUMP, so it must SET that value.
   expect(t.sequinContingency).toBe(C.CONTINGENCY_SEQUIN_JUMP);
   expect(t.sequinContingency).not.toBe(C.CONTINGENCY_SEQUIN_REMOVE);
 });
 
 test("in-stream CONTINGENCY_SEQUIN_UTILIZE does not close a running mode", () => {
-  // python's UTILIZE branch (unlike REMOVE/STITCH/JUMP) never toggles.
   const t = new Transcoder();
   const destination = new EmbPattern();
   t.transcode(
@@ -947,29 +892,25 @@ test("in-stream CONTINGENCY_SEQUIN_UTILIZE does not close a running mode", () =>
     destination
   );
   expect(t.sequinContingency).toBe(C.CONTINGENCY_SEQUIN_UTILIZE);
-  expect(t.stateSequinMode).toBe(true); // still on
+  expect(t.stateSequinMode).toBe(true);
   expect(destination.countStitchCommands(C.SEQUIN_MODE)).toBe(1);
 });
-
-/* ---------------------------- option commands -------------------------- */
 
 test("OPTION_MAX_* read the RAW stitch coordinates, not the transformed", () => {
   const t = new Transcoder({ translate: [100, 0] });
   const destination = new EmbPattern();
   t.transcode(
     buildSource([
-      [0, 0, C.STITCH], // -> (100, 0): settings translate applies
+      [0, 0, C.STITCH],
       [7, 999, C.OPTION_MAX_STITCH_LENGTH],
       [3, 999, C.OPTION_MAX_JUMP_LENGTH],
     ]),
     destination
   );
-  expect(t.maxStitch).toBe(7); // raw stitch[0], NOT 107
-  expect(t.maxJump).toBe(3); // raw stitch[0], NOT 103
+  expect(t.maxStitch).toBe(7);
+  expect(t.maxJump).toBe(3);
   expect(destination.stitches[0]).toStrictEqual([100, 0, C.STITCH]);
 });
-
-/* ----------------------------- matrix commands -------------------------- */
 
 test("MATRIX_TRANSLATE / SCALE / ROTATE / RESET apply mid-stream", () => {
   const t = new Transcoder();
@@ -977,14 +918,14 @@ test("MATRIX_TRANSLATE / SCALE / ROTATE / RESET apply mid-stream", () => {
   t.transcode(
     buildSource([
       [0, 0, C.STITCH],
-      [5, 0, C.MATRIX_TRANSLATE], // raw coords -> translate(5, 0)
-      [10, 0, C.STITCH], // -> (15, 0)
-      [2, 3, C.MATRIX_SCALE], // raw coords -> scale(2, 3)
-      [10, 10, C.STITCH], // (10,10)+translate(5,0) -> (15,10) *scale(2,3) -> (30,30)
-      [90, 0, C.MATRIX_ROTATE], // raw -> rotate 90 degrees
-      [0, 10, C.STITCH], // (0,10)+T -> (5,10) *S -> (10,30) *R90 -> (-30,10)
+      [5, 0, C.MATRIX_TRANSLATE],
+      [10, 0, C.STITCH],
+      [2, 3, C.MATRIX_SCALE],
+      [10, 10, C.STITCH],
+      [90, 0, C.MATRIX_ROTATE],
+      [0, 10, C.STITCH],
       [0, 0, C.MATRIX_RESET],
-      [7, 7, C.STITCH], // identity again -> (7, 7)
+      [7, 7, C.STITCH],
     ]),
     destination
   );
@@ -992,18 +933,16 @@ test("MATRIX_TRANSLATE / SCALE / ROTATE / RESET apply mid-stream", () => {
   expect(s[0]).toStrictEqual([0, 0, C.STITCH]);
   expect(s[1]).toStrictEqual([15, 0, C.STITCH]);
   expect(s[2]).toStrictEqual([30, 30, C.STITCH]);
-  closeTo(s[3][0], -30); // 90 deg rotation of (10, 30)
-  closeTo(s[3][1], 10); // (float: 10 + 30*cos(pi/2) ≈ 10.000000000000002)
+  closeTo(s[3][0], -30);
+  closeTo(s[3][1], 10);
   expect(s[4]).toStrictEqual([7, 7, C.STITCH]);
   expect(s[5]).toStrictEqual([7, 7, C.END]);
 });
 
-/* ------------------------------ unit-level ----------------------------- */
-
 test("add / updateNeedlePosition / declareNotTrimmed", () => {
   const t = new Transcoder();
   t.destinationPattern = new EmbPattern();
-  t.add(C.STOP); // no coords -> needle (0, 0)
+  t.add(C.STOP);
   t.updateNeedlePosition(4, 5);
   t.add(C.STOP);
   t.add(C.TRIM, 9, 9);
@@ -1016,9 +955,9 @@ test("add / updateNeedlePosition / declareNotTrimmed", () => {
   expect(t.colorIndex).toBe(-1);
   t.declareNotTrimmed();
   expect(t.stateTrimmed).toBe(false);
-  expect(t.colorIndex).toBe(0); // -1 -> 0
+  expect(t.colorIndex).toBe(0);
   t.colorIndex = 7;
-  t.declareNotTrimmed(); // already untrimmed -> no-op
+  t.declareNotTrimmed();
   expect(t.colorIndex).toBe(7);
 });
 
@@ -1038,16 +977,12 @@ test("positionWillExceedConstraint uses max_stitch and the raw stitch", () => {
   t.needleX = 0;
   t.needleY = 0;
   t.stitch = [10, 0, C.STITCH];
-  expect(t.positionWillExceedConstraint()).toBe(true); // |10| > 5
+  expect(t.positionWillExceedConstraint()).toBe(true);
   expect(t.positionWillExceedConstraint(20)).toBe(false);
   expect(t.positionWillExceedConstraint(undefined, 3, 4)).toBe(false);
   expect(t.positionWillExceedConstraint(undefined, 9, 0)).toBe(true);
-  // python: `if new_x is None or new_y is None` -> BOTH are recomputed
-  // from self.stitch, so the lone `3` is discarded.
   expect(t.positionWillExceedConstraint(undefined, 3)).toBe(true);
 });
-
-/* --------------------------- getNormalizedPattern ----------------------- */
 
 test("EmbPattern.getNormalizedPattern transcodes into a fresh pattern", () => {
   const p = new EmbPattern();
@@ -1056,7 +991,7 @@ test("EmbPattern.getNormalizedPattern transcodes into a fresh pattern", () => {
   p.addThread(thread);
   p.metadata("name", "Flowers");
   p.stitchAbs(1, 2);
-  p.stitch(3, 4); // (4, 6)
+  p.stitch(3, 4);
   const before = p.stitches.map((s) => [...s] as [number, number, number]);
 
   const n = p.getNormalizedPattern({ scale: 2 });
@@ -1065,11 +1000,11 @@ test("EmbPattern.getNormalizedPattern transcodes into a fresh pattern", () => {
     [8, 12, C.STITCH],
     [8, 12, C.END],
   ]);
-  expect(p.stitches).toStrictEqual(before); // source untouched
-  expect(n.threadlist[0]).toBe(thread); // threads shared by reference
+  expect(p.stitches).toStrictEqual(before);
+  expect(n.threadlist[0]).toBe(thread);
   expect(n.getMetadata("name")).toBe("Flowers");
 
-  const n2 = p.getNormalizedPattern(); // defaults == identity matrix
+  const n2 = p.getNormalizedPattern();
   expect(n2.stitches).toStrictEqual([
     [1, 2, C.STITCH],
     [4, 6, C.STITCH],

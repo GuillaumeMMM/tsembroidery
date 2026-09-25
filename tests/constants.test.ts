@@ -1,7 +1,6 @@
 import { test, expect } from "vitest";
 import { EmbConstant } from "../src/index.ts";
 
-// Pinned to pyembroidery EmbConstant.py values.
 test("EmbConstant core command values", () => {
   expect(EmbConstant.NO_COMMAND).toBe(-1);
   expect(EmbConstant.STITCH).toBe(0);

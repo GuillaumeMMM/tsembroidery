@@ -1,30 +1,13 @@
 # tsembroidery
 
-Read and write Brother `.pes` embroidery files and render designs as SVG. Based on [pyembroidery](https://github.com/EmbroidePy/pyembroidery).
+Read and write Brother `.pes` embroidery files, render them as SVG, and convert SVG strokes to stitches. Based on [pyembroidery](https://github.com/EmbroidePy/pyembroidery).
 
 ```ts
-import { EmbPattern, EmbThread, writePes } from "@guillaumemmm/tsembroidery";
+import { readPes, pesToSvg, svgToPes } from "@guillaumemmm/tsembroidery";
 
-const pattern = new EmbPattern();
-const thread = new EmbThread();
-thread.setColor(18, 52, 86);
-pattern.addThread(thread);
-pattern.stitchAbs(0, 0);
-pattern.stitch(100, 70);
-
-const pesBytes = writePes(pattern); // PES v6 by default
+const pattern = readPes(pesBytes);
+const svg = pesToSvg(pesBytes);
+const pes = svgToPes(svgText, { size: 100, stitchLength: 2.5 });
 ```
 
-`writePes` accepts either full PES v6 (`{ version: 6 }`) or v1 (`{ version: 1 }`) and returns a `Uint8Array`. The normal encoder settings use PES's 2047-unit stitch limit.
-
-The SVG-facing API is also exposed:
-
-```ts
-import { readSvg, svgToPes } from "@guillaumemmm/tsembroidery";
-
-declare const svgTextOrBytes: string | Uint8Array;
-const pattern = readSvg(svgTextOrBytes);
-const pesBytes = svgToPes(svgTextOrBytes, { version: 6 });
-```
-
-`readSvg` is currently a deliberately empty placeholder. It is the integration point for the SVG parser; until that parser is implemented, `svgToPes` returns a valid empty PES design.
+`readSvg`/`svgToPes` need a `DOMParser` (built into browsers; in Node use e.g. happy-dom). SVGs are fitted into a `size` mm square (default 100, a 10×10 cm hoop). Strokes are stitched (satin from 1 mm wide), fills are not yet; `<style>` sheets are ignored.

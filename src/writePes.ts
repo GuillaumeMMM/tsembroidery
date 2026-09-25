@@ -1,9 +1,3 @@
-/**
- * Brother PES writer, based on pyembroidery's PesWriter/PecWriter.
- *
- * This package supports full (non-truncated) PES v1 and v6. PES v6 is the
- * default because it preserves custom thread colors and design metadata.
- */
 import { EmbConstant } from "./constants.js";
 import { findNearestColorIndex } from "./thread.js";
 import type { EmbThread } from "./thread.js";
@@ -12,7 +6,7 @@ import type { Extents, Stitch } from "./pattern.js";
 import { getThreadSet } from "./pecThreads.js";
 import type { TranscoderSettings } from "./encoder.js";
 import { ByteWriter } from "./binaryWriter.js";
-import { writePec } from "./writePec.js";
+import { finiteExtents, truncateUtf8, writePec } from "./writePec.js";
 import type { PecColorInfo } from "./writePec.js";
 import { readSvg } from "./readers/svg.js";
 import type { SvgInput, SvgReadSettings } from "./readers/svg.js";
@@ -35,15 +29,12 @@ const MAX_PES_DELTA = 2047;
 const encoder = new TextEncoder();
 
 export interface PesSettings extends TranscoderSettings {
-  /** Normalize stitches for PES before serialization. Defaults to true. */
   encode?: boolean;
-  /** Full PES format version. Defaults to 6. */
   version?: 1 | 6;
 }
 
 export type SvgToPesSettings = PesSettings & SvgReadSettings;
 
-/** Serialize an EmbPattern as Brother PES bytes. */
 export function writePes(
   source: EmbPattern,
   settings?: PesSettings
@@ -76,7 +67,6 @@ export function writePes(
   return version === 6 ? writeVersion6(normalized) : writeVersion1(normalized);
 }
 
-/** SVG-to-PES conversion seam; readSvg remains the caller-owned parser. */
 export function svgToPes(
   input: SvgInput,
   settings?: SvgToPesSettings
@@ -102,8 +92,6 @@ function preparePatternForPes(pattern: EmbPattern): void {
     pattern.addThread(pattern.getThreadOrFiller(0));
   }
 
-  // PEC has no STOP command. Represent each stop as a color change to a
-  // duplicate of the current thread; the reader turns that back into STOP.
   let threadIndex = 0;
   for (const stitch of pattern.stitches) {
     const command = stitch[2] & COMMAND_MASK;
@@ -192,33 +180,24 @@ function patchPecOffset(out: ByteWriter, position: number): void {
   out.seek(pecPosition);
 }
 
-function finiteExtents(pattern: EmbPattern): Extents {
-  if (pattern.stitches.length === 0) {
-    return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  }
-  return pattern.extents();
-}
-
 function writePesHeaderV6(
   out: ByteWriter,
   pattern: EmbPattern,
   distinctBlockObjects: number
 ): void {
-  out.writeInt16le(1); // scale to fit
+  out.writeInt16le(1);
   out.writeBytes(encoder.encode("02"));
   for (const key of ["name", "category", "author", "keywords", "comments"]) {
     writePesString8(out, pattern.getMetadata(key));
   }
-
-  // Header fields skipped by PesReader. They remain zero-filled for a compact
-  // generic design with no image canvas or programmable-fill records.
-  out.writeBytes(new Array<number>(36).fill(0));
-  const imageFile = pattern.getMetadata("image_file");
-  writePesString8(out, imageFile);
-  out.writeBytes(new Array<number>(24).fill(0));
-  out.writeUint16le(0); // programmable fills
-  out.writeUint16le(0); // motifs
-  out.writeUint16le(0); // feather patterns
+  for (const value of [0, 0, 100, 100, 0, 200, 200, 100, 100, 100, 7, 19, 1, 1, 0, 100, 1, 0]) {
+    out.writeInt16le(value);
+  }
+  writePesString8(out, pattern.getMetadata("image_file"));
+  for (const value of [1, 0, 0, 1, 0, 0]) out.writeFloat32le(value);
+  out.writeUint16le(0);
+  out.writeUint16le(0);
+  out.writeUint16le(0);
   if (pattern.threadlist.length > 0xffff) {
     throw new RangeError("writePes: too many PES v6 threads");
   }
@@ -233,20 +212,10 @@ function writePesThread(out: ByteWriter, thread: EmbThread): void {
   out.writeUint8(thread.getGreen());
   out.writeUint8(thread.getBlue());
   out.writeUint8(0);
-  out.writeUint32le(0x0a); // custom color marker
+  out.writeUint32le(0x0a);
   writePesString8(out, thread.description);
   writePesString8(out, thread.brand);
   writePesString8(out, thread.chart);
-}
-
-function encodeAtMost(value: string, maxBytes: number): Uint8Array {
-  const bytes: number[] = [];
-  for (const character of value) {
-    const next = encoder.encode(character);
-    if (bytes.length + next.length > maxBytes) break;
-    bytes.push(...next);
-  }
-  return Uint8Array.from(bytes);
 }
 
 function writePesString8(out: ByteWriter, value: unknown): void {
@@ -254,13 +223,13 @@ function writePesString8(out: ByteWriter, value: unknown): void {
     out.writeUint8(0);
     return;
   }
-  const bytes = encodeAtMost(value, 255);
+  const bytes = truncateUtf8(value, 255);
   out.writeUint8(bytes.length);
   out.writeBytes(bytes);
 }
 
 function writePesString16(out: ByteWriter, value: string): void {
-  const bytes = encodeAtMost(value, 0xffff);
+  const bytes = truncateUtf8(value, 0xffff);
   out.writeUint16le(bytes.length);
   out.writeBytes(bytes);
 }
@@ -286,13 +255,7 @@ function writePesBlocks(
   const bottom = extents.maxY - centerY;
 
   writePesString16(out, "CEmbOne");
-  const sectionCountPosition = writePesSewSegHeader(
-    out,
-    left,
-    top,
-    right,
-    bottom
-  );
+  const sectionCountPosition = writePesSewSegHeader(out, right - left, bottom - top);
   out.writeUint16le(0xffff);
   out.writeUint16le(0);
 
@@ -319,30 +282,12 @@ function writePesBlocks(
   };
 }
 
-function writePesSewSegHeader(
-  out: ByteWriter,
-  left: number,
-  top: number,
-  right: number,
-  bottom: number
-): number {
-  void left;
-  void top;
-  void right;
-  const width = right - left;
-  const height = bottom - top;
+function writePesSewSegHeader(out: ByteWriter, width: number, height: number): number {
   for (let index = 0; index < 8; index++) out.writeUint16le(0);
 
   const translateX = 350 + 1300 / 2 - width / 2;
   const translateY = 100 + height + 1800 / 2 - height / 2;
-  out.writeFloat32le(1);
-  out.writeFloat32le(0);
-  out.writeFloat32le(0);
-  out.writeFloat32le(1);
-  out.writeFloat32le(0);
-  out.writeFloat32le(0);
-  out.writeFloat32le(translateX);
-  out.writeFloat32le(translateY);
+  for (const value of [1, 0, 0, 1, translateX, translateY]) out.writeFloat32le(value);
   out.writeUint16le(1);
   out.writeUint16le(0);
   out.writeUint16le(0);
@@ -452,8 +397,6 @@ function writePesAddendum(out: ByteWriter, colorInfo: PecColorInfo): void {
       0x20
     )
   );
-  for (const color of colorInfo.rgbList) {
-    out.writeBytes(new Array<number>(0x90).fill(0));
-    out.writeInt24le(color);
-  }
+  out.writeBytes(new Array<number>(0x90 * colorInfo.rgbList.length).fill(0));
+  for (const color of colorInfo.rgbList) out.writeInt24le(color);
 }

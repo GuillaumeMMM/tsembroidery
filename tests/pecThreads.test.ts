@@ -16,20 +16,20 @@ test("PEC chart spot checks (pinned to EmbThreadPec.py)", () => {
 
   expect(at(5).description).toBe("Red");
   expect(at(5).catalog_number).toBe("5");
-  expect(at(5).hexColor()).toBe("#ed171f"); // 237,23,31
+  expect(at(5).hexColor()).toBe("#ed171f");
 
   expect(at(13).description).toBe("Yellow");
-  expect(at(13).hexColor()).toBe("#ffff00"); // 255,255,0
+  expect(at(13).hexColor()).toBe("#ffff00");
 
   expect(at(20).description).toBe("Black");
   expect(at(20).hexColor()).toBe("#000000");
 
   expect(at(29).description).toBe("White");
-  expect(at(29).hexColor()).toBe("#f0f0f0"); // 240,240,240
+  expect(at(29).hexColor()).toBe("#f0f0f0");
 
   expect(at(64).description).toBe("Applique");
   expect(at(64).catalog_number).toBe("64");
-  expect(at(64).hexColor()).toBe("#ffc8c8"); // 255,200,200
+  expect(at(64).hexColor()).toBe("#ffc8c8");
 });
 
 test("PEC chart entries carry Brother brand/chart", () => {

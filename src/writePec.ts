@@ -1,9 +1,3 @@
-/**
- * Internal Brother PEC serializer used by the PES writer.
- *
- * The stitch stream follows pyembroidery's PecWriter, while the header
- * layout is kept compatible with this package's existing PecReader.
- */
 import { EmbConstant } from "./constants.js";
 import { findNearestColorIndex } from "./thread.js";
 import type { EmbThread } from "./thread.js";
@@ -12,21 +6,15 @@ import { getThreadSet } from "./pecThreads.js";
 import { pyRound } from "./pyMath.js";
 import { ByteWriter } from "./binaryWriter.js";
 
-const {
-  COMMAND_MASK,
-  STITCH,
-  JUMP,
-  TRIM,
-  STOP,
-  END,
-  COLOR_CHANGE,
-} = EmbConstant;
+const { COMMAND_MASK, STITCH, JUMP, END, COLOR_CHANGE } = EmbConstant;
 
 const JUMP_CODE = 0x10;
 const TRIM_CODE = 0x20;
 const PEC_ICON_WIDTH = 48;
 const PEC_ICON_HEIGHT = 38;
 const PEC_STRIDE = 6;
+const PEC_HEADER_SIZE = 512;
+const SPACE = 0x20;
 
 const encoder = new TextEncoder();
 
@@ -38,20 +26,18 @@ function fromHex(hex: string): number[] {
   return bytes;
 }
 
-/** pyembroidery's 48x6 grayscale preview frame. */
 const BLANK_GRAPHIC = Uint8Array.from(
   fromHex(
-    "000000000000f0ffffffff0f080000000010040000000020020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040040000000020080000000010f0ffffffff0f000000000000"
+    "000000000000f0ffffffff0f080000000010040000000020020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040040000000020080000000010f0ffffffff0f000000000000"
   )
 );
 
 export interface PecColorInfo {
-  /** Includes the leading color-count byte, as PES v6 addenda expect. */
   colorIndexList: number[];
   rgbList: number[];
 }
 
-function truncateUtf8(value: string, maxBytes: number): Uint8Array {
+export function truncateUtf8(value: string, maxBytes: number): Uint8Array {
   const bytes: number[] = [];
   for (const character of value) {
     const next = encoder.encode(character);
@@ -61,13 +47,11 @@ function truncateUtf8(value: string, maxBytes: number): Uint8Array {
   return Uint8Array.from(bytes);
 }
 
-function labelBytes(pattern: EmbPattern): Uint8Array {
-  const metadata = pattern.getMetadata("name");
-  const name = typeof metadata === "string" ? metadata : "Untitled";
-  const label = truncateUtf8(name, 16);
-  const padded = new Uint8Array(16).fill(0x20);
-  padded.set(label);
-  return padded;
+export function finiteExtents(pattern: EmbPattern): Extents {
+  if (pattern.stitches.length === 0) {
+    return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  }
+  return pattern.extents();
 }
 
 function sameThreadValue(a: EmbThread, b: EmbThread): boolean {
@@ -104,88 +88,53 @@ function buildUniquePalette(threadlist: EmbThread[]): number[] {
   }
 
   return threadlist.map(
-    (thread) =>
-      assignments[
-        uniqueThreads.findIndex((unique) => sameThreadValue(unique, thread))
-      ] ?? -1
+    (thread) => assignments[uniqueThreads.findIndex((unique) => sameThreadValue(unique, thread))]
   );
 }
 
-/** Append a PEC header, stitch block, and preview frames to `out`. */
-export function writePec(
-  pattern: EmbPattern,
-  out: ByteWriter,
-  threadlist: EmbThread[] = pattern.threadlist
-): PecColorInfo {
+export function writePec(pattern: EmbPattern, out: ByteWriter): PecColorInfo {
   const extents = finiteExtents(pattern);
   const palette = buildUniquePalette(pattern.threadlist);
-  if (palette.some((index) => index < 0)) {
-    throw new RangeError("writePes: could not map every thread to the PEC palette");
+  if (palette.length < 1 || palette.length > 255) {
+    throw new RangeError("writePes: PES supports between 1 and 255 color blocks");
   }
-  if (palette.length < 1 || palette.length > 256) {
-    throw new RangeError("writePes: PES supports between 1 and 256 color blocks");
-  }
-
-  const colorInfo: PecColorInfo = {
-    colorIndexList: [palette.length - 1, ...palette],
-    rgbList: threadlist.map((thread) => thread.color),
-  };
 
   const pecStart = out.tell();
-  out.writeBytes(new TextEncoder().encode("LA:"));
-  out.writeBytes(labelBytes(pattern));
-  // CR, 12 spaces, FF FF. The reader resumes at the stride byte.
-  out.writeBytes([
-    0x0d,
-    ...new Array<number>(12).fill(0x20),
-    0xff,
-    0xff,
-  ]);
+  const name = pattern.getMetadata("name");
+  const label = new Uint8Array(16).fill(SPACE);
+  label.set(truncateUtf8(typeof name === "string" ? name : "Untitled", 8));
+  out.writeBytes(encoder.encode("LA:"));
+  out.writeBytes(label);
+  out.writeUint8(0x0d);
+  out.writeBytes([...new Array<number>(12).fill(SPACE), 0xff, 0x00]);
   out.writeUint8(PEC_ICON_WIDTH / 8);
   out.writeUint8(PEC_ICON_HEIGHT);
-  out.writeBytes(new Array<number>(12).fill(0));
-  out.writeUint8(palette.length - 1);
-  out.writeBytes(palette);
-  if (out.tell() > pecStart + 514) {
-    throw new RangeError("writePes: too many PEC colors for the fixed header");
-  }
-  out.seek(pecStart + 514);
+  out.writeBytes(new Array<number>(12).fill(SPACE));
+  const colorIndexList = [palette.length - 1, ...palette];
+  out.writeBytes(colorIndexList);
+  out.writeBytes(new Array<number>(pecStart + PEC_HEADER_SIZE - out.tell()).fill(SPACE));
 
   writePecBlock(pattern, out, extents);
   writePecGraphics(pattern, out, extents);
-  return colorInfo;
+  return {
+    colorIndexList,
+    rgbList: pattern.threadlist.map((thread) => thread.color),
+  };
 }
 
-function finiteExtents(pattern: EmbPattern): Extents {
-  if (pattern.stitches.length === 0) {
-    return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  }
-  return pattern.extents();
-}
-
-function writePecBlock(
-  pattern: EmbPattern,
-  out: ByteWriter,
-  extents: Extents
-): void {
+function writePecBlock(pattern: EmbPattern, out: ByteWriter, extents: Extents): void {
   const blockStart = out.tell();
-  const lengthPosition = blockStart;
+  out.writeBytes([0x00, 0x00]);
   out.writeInt24le(0);
-
-  const width = extents.maxX - extents.minX;
-  const height = extents.maxY - extents.minY;
   out.writeBytes([0x31, 0xff, 0xf0]);
-  out.writeInt16le(pyRound(width));
-  out.writeInt16le(pyRound(height));
+  out.writeInt16le(pyRound(extents.maxX - extents.minX));
+  out.writeInt16le(pyRound(extents.maxY - extents.minY));
   out.writeInt16le(0x1e0);
   out.writeInt16le(0x1b0);
-  // Two reserved shorts are part of the 15-byte marker expected by the reader.
-  out.writeInt16le(0);
-  out.writeInt16le(0);
   encodePecStitches(pattern, out);
 
   const blockEnd = out.tell();
-  out.seek(lengthPosition);
+  out.seek(blockStart + 2);
   out.writeInt24le(blockEnd - blockStart);
   out.seek(blockEnd);
 }
@@ -203,52 +152,31 @@ function checkedDelta(value: number): number {
   return rounded;
 }
 
-function writeValue(
-  out: ByteWriter,
-  value: number,
-  forceLong = false,
-  flag = 0
-): void {
+function writeValue(out: ByteWriter, value: number, forceLong = false, flag = 0): void {
   if (!forceLong && value > -64 && value < 63) {
     out.writeUint8(value & 0x7f);
     return;
   }
-  const encoded =
-    (value & 0x0fff) | 0x8000 | (flag << 8);
+  const encoded = (value & 0x0fff) | 0x8000 | (flag << 8);
   out.writeUint8((encoded >> 8) & 0xff);
   out.writeUint8(encoded & 0xff);
 }
 
-function writeStitch(out: ByteWriter, dx: number, dy: number): void {
-  writeValue(out, dx);
-  writeValue(out, dy);
-}
-
-function writeJump(out: ByteWriter, dx: number, dy: number): void {
-  writeValue(out, dx, true, JUMP_CODE);
-  writeValue(out, dy, true, JUMP_CODE);
-}
-
-function writeTrimJump(out: ByteWriter, dx: number, dy: number): void {
-  writeValue(out, dx, true, TRIM_CODE);
-  writeValue(out, dy, true, TRIM_CODE);
+function writeDelta(out: ByteWriter, dx: number, dy: number, flag?: number): void {
+  writeValue(out, dx, flag !== undefined, flag);
+  writeValue(out, dy, flag !== undefined, flag);
 }
 
 function encodePecStitches(pattern: EmbPattern, out: ByteWriter): void {
   let colorTwo = true;
   let jumping = true;
   let initial = true;
-  let ended = false;
   let x = 0;
   let y = 0;
 
   for (const stitch of pattern.stitches) {
     const command = stitch[2] & COMMAND_MASK;
-    if (command === END) {
-      out.writeUint8(0xff);
-      ended = true;
-      break;
-    }
+    if (command === END) break;
 
     const dx = checkedDelta(stitch[0] - x);
     const dy = checkedDelta(stitch[1] - y);
@@ -257,56 +185,38 @@ function encodePecStitches(pattern: EmbPattern, out: ByteWriter): void {
 
     if (command === STITCH) {
       if (jumping) {
-        if (dx !== 0 && dy !== 0) writeStitch(out, 0, 0);
+        if (dx !== 0 && dy !== 0) writeDelta(out, 0, 0);
         jumping = false;
       }
-      writeStitch(out, dx, dy);
+      writeDelta(out, dx, dy);
     } else if (command === JUMP) {
       jumping = true;
-      if (initial) writeJump(out, dx, dy);
-      else writeTrimJump(out, dx, dy);
+      writeDelta(out, dx, dy, initial ? JUMP_CODE : TRIM_CODE);
     } else if (command === COLOR_CHANGE) {
       if (jumping) {
-        writeStitch(out, 0, 0);
+        writeDelta(out, 0, 0);
         jumping = false;
       }
       out.writeBytes([0xfe, 0xb0, colorTwo ? 0x02 : 0x01]);
       colorTwo = !colorTwo;
-    } else if (command === STOP || command === TRIM) {
-      // STOPs are converted to duplicate-thread color changes before writing.
-      // Explicit TRIMs are represented by the trim flag on a following jump.
     }
     initial = false;
   }
-
-  if (!ended) out.writeUint8(0xff);
+  out.writeUint8(0xff);
 }
 
-function writePecGraphics(
-  pattern: EmbPattern,
-  out: ByteWriter,
-  extents: Extents
-): void {
+function writePecGraphics(pattern: EmbPattern, out: ByteWriter, extents: Extents): void {
   const allPoints: Stitch[] = [];
   for (const [block] of pattern.getAsStitchblock()) allPoints.push(...block);
   out.writeBytes(drawScaled(extents, allPoints, 4));
 
   for (const [block] of pattern.getAsColorblocks()) {
-    out.writeBytes(
-      drawScaled(
-        extents,
-        block.filter((stitch) => (stitch[2] & COMMAND_MASK) === STITCH),
-        5
-      )
-    );
+    const stitches = block.filter((stitch) => (stitch[2] & COMMAND_MASK) === STITCH);
+    out.writeBytes(drawScaled(extents, stitches, 5));
   }
 }
 
-function drawScaled(
-  extents: Extents,
-  points: Stitch[],
-  buffer: number
-): Uint8Array {
+function drawScaled(extents: Extents, points: Stitch[], buffer: number): Uint8Array {
   const graphic = BLANK_GRAPHIC.slice();
   const diagramWidth = extents.maxX - extents.minX || 1;
   const diagramHeight = extents.maxY - extents.minY || 1;
@@ -316,17 +226,14 @@ function drawScaled(
     (graphicWidth - buffer) / diagramWidth,
     (graphicHeight - buffer) / diagramHeight
   );
-  const centerX = (extents.maxX + extents.minX) / 2;
-  const centerY = (extents.maxY + extents.minY) / 2;
-  const translateX = graphicWidth / 2 - centerX * scale;
-  const translateY = graphicHeight / 2 - centerY * scale;
+  const translateX = graphicWidth / 2 - ((extents.maxX + extents.minX) / 2) * scale;
+  const translateY = graphicHeight / 2 - ((extents.maxY + extents.minY) / 2) * scale;
 
   for (const point of points) {
     const x = Math.floor(point[0] * scale + translateX);
     const y = Math.floor(point[1] * scale + translateY);
     if (x < 0 || x >= graphicWidth || y < 0 || y >= graphicHeight) continue;
-    graphic[y * PEC_STRIDE + Math.floor(x / 8)] |=
-      1 << Math.floor(x % 8);
+    graphic[y * PEC_STRIDE + Math.floor(x / 8)] |= 1 << x % 8;
   }
   return graphic;
 }

@@ -1,10 +1,4 @@
-/**
- * Port of the module-level math helpers of pyembroidery `EmbEncoder.py`.
- *
- * Matrices are row-major 9-tuples `(m0..m8)` exactly as python stores
- * them; `point_in_matrix_space` transforms a stitch and carries its
- * command through (python relies on the 3rd element round-tripping).
- */
+/** Row-major 3x3 matrices applied to row vectors, as in pyembroidery. */
 import { pyRound } from "./pyMath.js";
 
 export type Matrix = number[];
@@ -22,7 +16,6 @@ export function getTranslate(tx: number, ty: number): Matrix {
   return [1, 0, 0, 0, 1, 0, tx, ty, 1];
 }
 
-/** Rotation by `theta` degrees. */
 export function getRotate(theta: number): Matrix {
   const tau = Math.PI * 2;
   theta *= tau / 360;
@@ -45,7 +38,7 @@ export function matrixMultiply(a: Matrix, b: Matrix): Matrix {
   ];
 }
 
-/** Transforms point `(v0, v1)`; when `v1` is omitted `v0` is an [x, y, extra] triple. */
+/** Keeps a third element (the stitch command) when given one. */
 export function pointInMatrixSpace(
   matrix: Matrix,
   v0: number | [number, number, ...unknown[]],
@@ -55,8 +48,8 @@ export function pointInMatrixSpace(
     const p = v0 as [number, number, ...unknown[]];
     const x = p[0] * matrix[0] + p[1] * matrix[3] + 1 * matrix[6];
     const y = p[0] * matrix[1] + p[1] * matrix[4] + 1 * matrix[7];
-    if (p.length >= 3) return [x, y, p[2]]; // carries the command through
-    return [x, y]; // Must not have had a 3rd element.
+    if (p.length >= 3) return [x, y, p[2]];
+    return [x, y];
   }
   const a = v0 as number;
   return [
@@ -77,7 +70,6 @@ export function distance(x0: number, y0: number, x1: number, y1: number): number
   return Math.sqrt(distanceSquared(x0, y0, x1, y1));
 }
 
-/** amount within [0, 1] -> interpolate between a and b */
 export function towards(a: number, b: number, amount: number): number {
   return amount * (b - a) + a;
 }
@@ -86,7 +78,6 @@ export function angleRadians(x0: number, y0: number, x1: number, y1: number): nu
   return Math.atan2(y1 - y0, x1 - x0);
 }
 
-/** From (x0,y0) toward (x1,y1), at distance r. */
 export function oriented(
   x0: number,
   y0: number,
@@ -98,5 +89,4 @@ export function oriented(
   return [x0 + r * Math.cos(radians), y0 + r * Math.sin(radians)];
 }
 
-// re-exported because EmbEncoder interpolates with python's round()
 export { pyRound };

@@ -1,26 +1,10 @@
-/**
- * Port of pyembroidery `EmbPattern.py`.
- *
- * A stitch is `[x, y, command]` with absolute coordinates; commands are
- * `EmbConstant` values. "Relative" calls compute against `_previousX/Y`
- * and `add_stitch_absolute` always updates that cursor; `add_command`
- * (not ported as a separate name — python's `add_command`) appends
- * WITHOUT moving the cursor.
- *
- * Divergences from python (deliberate, see tests):
- *  - `get_thread_or_filler` returns a FRESH black thread per call instead
- *    of a random one (decision: deterministic filler). It must stay a new
- *    instance so identity comparisons against `threadlist` keep behaving
- *    like python's random fillers (always unequal -> COLOR_CHANGE).
- *  - duplicate color-change conversion uses value equality because PES v6
- *    reconstructs equivalent thread records as separate objects.
- */
+/** Port of pyembroidery's EmbPattern. Stitches are absolute [x, y, command], in 0.1 mm. */
 import { EmbConstant, type Command } from "./constants.js";
 import { EmbThread } from "./thread.js";
 import { pyRound } from "./pyMath.js";
 import { Transcoder, type TranscoderSettings } from "./encoder.js";
 
-/** Match pyembroidery's value-based EmbThread equality for color changes. */
+/** Value equality: PES v6 reads equal threads as separate objects. */
 function sameThread(a: EmbThread, b: EmbThread): boolean {
   return (
     a === b ||
@@ -34,13 +18,10 @@ function sameThread(a: EmbThread, b: EmbThread): boolean {
   );
 }
 
-/** Raw stitch record: absolute x, absolute y, command. */
 export type Stitch = [number, number, Command | number];
 
-/** `[block, thread]` pair yielded by the stitchblock iterator. */
 export type StitchBlock = [Stitch[], EmbThread];
 
-/** Object form accepted by `addThread` (python's dict overload). */
 export interface ThreadSpec {
   name?: string;
   description?: string;
@@ -64,14 +45,10 @@ export interface Extents {
 export class EmbPattern {
   stitches: Stitch[] = [];
   threadlist: EmbThread[] = [];
-  /** Metadata store (python `extras`). Key type: python uses both strings and ints (PEC graphics); we keep it general. */
   extras: Record<string | number, unknown> = {};
   _previousX = 0;
   _previousY = 0;
 
-  /* --------------------------- construction --------------------------- */
-
-  /** Move to (dx, dy) relative to the previous position, without stitching. */
   move(dx = 0, dy = 0): void {
     this.addStitchRelative(EmbConstant.JUMP, dx, dy);
   }
@@ -112,11 +89,6 @@ export class EmbPattern {
     this.addStitchRelative(EmbConstant.END, dx, dy);
   }
 
-  /**
-   * Adds a thread. Note: this has no effect on stitching and can be done
-   * at any point. Accepts an EmbThread, a packed color number, or a
-   * ThreadSpec object (python's dict overload).
-   */
   addThread(thread: EmbThread | number | ThreadSpec): void {
     if (thread instanceof EmbThread) {
       this.threadlist.push(thread);
@@ -166,34 +138,23 @@ export class EmbPattern {
       : fallback;
   }
 
-  /* --------------------------- stitch additions ------------------------ */
-
-  /** Add a command at the absolute location: x, y. */
   addStitchAbsolute(cmd: Command | number, x = 0, y = 0): void {
     this.stitches.push([x, y, cmd]);
     this._previousX = x;
     this._previousY = y;
   }
 
-  /** Add a command relative to the previous location. */
   addStitchRelative(cmd: Command | number, dx = 0, dy = 0): void {
     const x = this._previousX + dx;
     const y = this._previousY + dy;
     this.addStitchAbsolute(cmd, x, y);
   }
 
-  /**
-   * Add a command WITHOUT treating its parameters as a location that
-   * requires an update of the previous-position cursor.
-   */
+  /** Appends without moving the relative-position cursor. */
   addCommand(cmd: Command | number, x = 0, y = 0): void {
     this.stitches.push([x, y, cmd]);
   }
 
-  /**
-   * Adds a `[block, thread]` stitchblock. Emits COLOR_BREAK when the
-   * thread differs (identity!) from the last thread, else SEQUENCE_BREAK.
-   */
   addStitchblock(stitchblock: StitchBlock): void {
     const threadlist = this.threadlist;
     const block = stitchblock[0];
@@ -209,8 +170,6 @@ export class EmbPattern {
     }
   }
 
-  /* ------------------------------ measures ----------------------------- */
-
   extents(): Extents {
     let minX = Infinity;
     let minY = Infinity;
@@ -225,7 +184,6 @@ export class EmbPattern {
     return { minX, minY, maxX, maxY };
   }
 
-  /** legacy compatibility for typo (python `extends = extents`) */
   extends = this.extents;
 
   countStitchCommands(command: Command | number): number {
@@ -248,8 +206,6 @@ export class EmbPattern {
     return this.threadlist.length;
   }
 
-  /* ------------------------------ threads ------------------------------ */
-
   static getRandomThread(): EmbThread {
     const thread = new EmbThread();
     thread.color = (0xff000000 | Math.floor(Math.random() * 0x1000000)) >>> 0;
@@ -257,14 +213,7 @@ export class EmbPattern {
     return thread;
   }
 
-  /**
-   * Returns the thread at `index`, or a filler when the list is short.
-   *
-   * DIVERGENCE: python returns a new RANDOM-colored thread here. We
-   * return a new BLACK thread (deterministic), one fresh instance per
-   * call so identity-based comparisons keep matching python's behavior
-   * (python's random instance is never identical to a stored one either).
-   */
+  /** Missing threads get a fresh black filler (pyembroidery uses a random color). */
   getThreadOrFiller(index: number): EmbThread {
     if (this.threadlist.length <= index) return EmbPattern.getFillerThread();
     return this.threadlist[index];
@@ -277,12 +226,6 @@ export class EmbPattern {
     return thread;
   }
 
-  /* --------------------------- block iterators ------------------------- */
-
-  /**
-   * Yields `[stitchblock, thread]` runs of STITCH commands; a COLOR_CHANGE
-   * swaps the thread. Non-stitch commands close the current block.
-   */
   *getAsStitchblock(): Generator<StitchBlock> {
     let stitchblock: Stitch[] = [];
     let thread = this.getThreadOrFiller(0);
@@ -305,7 +248,6 @@ export class EmbPattern {
     if (stitchblock.length > 0) yield [stitchblock, thread];
   }
 
-  /** Yields runs of stitches grouped by command transitions. */
   *getAsCommandBlocks(): Generator<Stitch[]> {
     let lastPos = 0;
     let lastCommand: Command | number = EmbConstant.NO_COMMAND;
@@ -323,7 +265,6 @@ export class EmbPattern {
     yield this.stitches.slice(lastPos);
   }
 
-  /** Yields runs of stitches grouped by COLOR_CHANGE, with their thread. */
   *getAsColorblocks(): Generator<[Stitch[], EmbThread]> {
     let threadIndex = 0;
     let lastPos = 0;
@@ -339,7 +280,6 @@ export class EmbPattern {
     yield [this.stitches.slice(lastPos), thread];
   }
 
-  /** All threads, deduplicated by identity (python: `set(...)`)... as a list. */
   getUniqueThreadlist(): EmbThread[] {
     return [...new Set(this.threadlist)];
   }
@@ -354,12 +294,10 @@ export class EmbPattern {
     return singleton;
   }
 
-  /* ---------------------------- transforms ----------------------------- */
-
   moveCenterToOrigin(): void {
     const extents = this.extents();
-    const cx = pyRound((extents.maxX - extents.minX) / 2.0);
-    const cy = pyRound((extents.maxY - extents.minY) / 2.0);
+    const cx = pyRound((extents.maxX + extents.minX) / 2);
+    const cy = pyRound((extents.maxY + extents.minY) / 2);
     this.translate(-cx, -cy);
   }
 
@@ -370,10 +308,6 @@ export class EmbPattern {
     }
   }
 
-  /**
-   * Ensures there are threads for all color blocks (extends the list with
-   * fillers until every color block has a thread).
-   */
   fixColorCount(): void {
     let threadIndex = 0;
     let initColor = true;
@@ -397,12 +331,6 @@ export class EmbPattern {
     }
   }
 
-  /* --------------------------- conversions ----------------------------- */
-
-  /**
-   * Merges jump runs; sequences of `jumpsToRequireTrim` or more jumps
-   * become a TRIM. Assumes core (not middle-level) commands.
-   */
   convertJumpsToTrim(jumpsToRequireTrim = 3): void {
     const tempPattern = new EmbPattern();
     let i = -1;
@@ -441,7 +369,6 @@ export class EmbPattern {
     this.stitches = tempPattern.stitches;
   }
 
-  /** Converts a color change to the same thread value into a STOP. */
   convertDuplicateColorChangeToStop(): void {
     const newPattern = new EmbPattern();
     newPattern.addThread(this.getThreadOrFiller(0));
@@ -471,7 +398,6 @@ export class EmbPattern {
     this.threadlist = newPattern.threadlist;
   }
 
-  /** Converts stops to a color change to the same color. */
   convertStopToColorChange(): void {
     const newPattern = new EmbPattern();
     newPattern.addThread(this.getThreadOrFiller(0));
@@ -494,9 +420,6 @@ export class EmbPattern {
     this.threadlist = newPattern.threadlist;
   }
 
-  /**
-   * Replaces all JUMP sequences with a single STITCH_BREAK (middle-level).
-   */
   getPatternMergeJumps(): EmbPattern {
     const newPattern = new EmbPattern();
     let i = -1;
@@ -518,10 +441,6 @@ export class EmbPattern {
     return newPattern;
   }
 
-  /**
-   * Stabilized copy: one COLOR_BREAK/SEQUENCE_BREAK + raw stitches per
-   * stitchblock (jump/trim noise removed).
-   */
   getStablePattern(): EmbPattern {
     const stablePattern = new EmbPattern();
     for (const stitchblock of this.getAsStitchblock()) {
@@ -531,18 +450,6 @@ export class EmbPattern {
     return stablePattern;
   }
 
-  /**
-   * python:
-   *     def get_normalized_pattern(self, encode_settings=None):
-   *         """Encodes"""
-   *         normal_pattern = EmbPattern()
-   *         transcoder = Normalizer(encode_settings)
-   *         transcoder.transcode(self, normal_pattern)
-   *         return normal_pattern
-   *
-   * (python imports `Transcoder as Normalizer` at the top of
-   * EmbPattern.py.)
-   */
   getNormalizedPattern(encodeSettings?: TranscoderSettings): EmbPattern {
     const normalPattern = new EmbPattern();
     const transcoder = new Transcoder(encodeSettings);
@@ -550,9 +457,6 @@ export class EmbPattern {
     return normalPattern;
   }
 
-  /* ------------------------- encoder options --------------------------- */
-
-  /** Appends an inline translation shift for the encoder. */
   appendTranslation(x: number, y: number): void {
     this.addStitchRelative(EmbConstant.MATRIX_TRANSLATE, x, y);
   }

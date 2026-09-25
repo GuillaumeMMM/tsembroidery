@@ -38,8 +38,6 @@ function commands(p: EmbPattern): number[] {
   return p.stitches.map((s) => s[2]);
 }
 
-/* --------------------------- #PEC0001 path ---------------------------- */
-
 test("PES: #PEC0001 container reads the bare PEC block (offset 8)", () => {
   const p = read(buildPecContainer(SIMPLE_PEC));
   expect(p.stitches).toStrictEqual([
@@ -51,12 +49,9 @@ test("PES: #PEC0001 container reads the bare PEC block (offset 8)", () => {
   expect(p.threadlist.length).toBe(1);
 });
 
-/* ----------------------------- #PES0001 ------------------------------- */
-
 test("PES: #PES0001 header is skipped entirely, PEC read at offset", () => {
   const p = read(buildPes("#PES0001", [], SIMPLE_PEC));
   expect(commands(p)).toStrictEqual([C.STITCH, C.STITCH, C.END]);
-  // v1 header has no threads -> PEC color table used (index 5 = Red)
   expect(p.threadlist[0].hexColor()).toBe("#ed171f");
 });
 
@@ -70,8 +65,6 @@ test("PES: unknown magic still reads the PEC block (python: pass)", () => {
   expect(commands(p)).toStrictEqual([C.STITCH, C.STITCH, C.END]);
   expect(p.getMetadata("Label")).toBe("Test Label");
 });
-
-/* ----------------------------- metadata ------------------------------- */
 
 test("PES: #PES0040 reads metadata fields", () => {
   const header = [
@@ -101,8 +94,6 @@ test("PES: null (0-length) metadata string is not stored", () => {
   expect(Object.keys(p.extras).filter((k) => k !== "Label")).toStrictEqual([]);
 });
 
-/* ------------------------------ threads ------------------------------- */
-
 function v5Header(
   threadRecords: number[][],
   overrides?: {
@@ -127,12 +118,6 @@ function v5Header(
   ]);
 }
 
-/**
- * PEC stream with a COLOR_CHANGE: after read, convertDuplicateColorChange
- * keeps thread[0] plus one thread per color change — without one, a multi
- * thread list would legitimately collapse to a single thread (python does
- * the same).
- */
 const COLOR_CHANGE_STREAM = bytes(
   encStitch(5, 5),
   [0xfe, 0xb0, 0x00],
@@ -153,7 +138,6 @@ test("PES: #PES0050 reads thread list (24-byte skip, image key)", () => {
   expect(p.threadlist[0].description).toBe("d1");
   expect(p.threadlist[0].brand).toBe("b1");
   expect(p.threadlist[0].chart).toBe("ch1");
-  // int24be color | 0xFF000000
   expect(p.threadlist[0].color).toBe(0xff112233 >>> 0);
   expect(p.threadlist[0].hexColor()).toBe("#112233");
   expect(p.threadlist[1].hexColor()).toBe("#aabbcc");
@@ -171,28 +155,26 @@ test("PES: #PES0055 and #PES0056 use the v5 header path", () => {
 
 test("PES: #PES0060 uses 36-byte skip and image_file key", () => {
   const header = v5Header([pesThread({ color: 0x00ff00 })]);
-  // v6: 4 pad + metadata + 36 (not 24) + image + 24 + counts + threads
   const v6 = Uint8Array.from([
     ...fillers(4),
     ...pesMetadata(["Six", null, null, null, null]),
     ...fillers(36),
     ...pesString("six.png"),
     ...fillers(24),
-    0, 0, // fills
-    0, 0, // motifs
-    0, 0, // feather
-    1, 0, // count_threads = 1
+    0, 0,
+    0, 0,
+    0, 0,
+    1, 0,
     ...pesThread({ color: 0x00ff00 }),
   ]);
   const p = read(buildPes("#PES0060", v6, SIMPLE_PEC, { pecOffset: 12 + v6.length }));
   expect(p.getMetadata("image_file")).toBe("six.png");
-  expect(p.getMetadata("image")).toBe(undefined); // v5-only key
+  expect(p.getMetadata("image")).toBe(undefined);
   expect(p.threadlist.length).toBe(1);
   expect(p.getMetadata("name")).toBe("Six");
 });
 
 test("PES: header threads win over PEC color table (1:1 mode)", () => {
-  // 1 header thread vs 1 PEC color byte -> 1:1 mode uses the header thread
   const header = v5Header([pesThread({ color: 0x556677 })]);
   const p = read(buildPes("#PES0050", header, SIMPLE_PEC, { pecOffset: 12 + header.length }));
   expect(p.threadlist.length).toBe(1);
@@ -202,8 +184,8 @@ test("PES: header threads win over PEC color table (1:1 mode)", () => {
 test("PES: programmable fills > 0 aborts header (no threads read)", () => {
   const header = v5Header([pesThread({ color: 0x556677 })], { fills: 1 });
   const p = read(buildPes("#PES0050", header, SIMPLE_PEC, { pecOffset: 12 + header.length }));
-  expect(p.threadlist.length).toBe(1); // from PEC table, not header
-  expect(p.threadlist[0].hexColor()).toBe("#ed171f"); // index 5 = Red
+  expect(p.threadlist.length).toBe(1);
+  expect(p.threadlist[0].hexColor()).toBe("#ed171f");
 });
 
 test("PES: motifs > 0 aborts header after fills check", () => {
@@ -218,12 +200,7 @@ test("PES: feather patterns > 0 aborts header too", () => {
   expect(p.threadlist[0].hexColor()).toBe("#ed171f");
 });
 
-/* ------------------- convertDuplicateColorChangeToStop ---------------- */
-
 test("PES: duplicate-color color changes become STOP after read", () => {
-  // PEC color bytes [5, 5] push the SAME chart instance twice (python
-  // process_pec_colors reuses threadSet[5]), so the second color block
-  // resolves to the identical thread object -> converted to STOP.
   const stream = bytes(
     encStitch(5, 5),
     [0xfe, 0xb0, 0x00],
@@ -235,7 +212,7 @@ test("PES: duplicate-color color changes become STOP after read", () => {
   const cmds = commands(p);
   expect(cmds.includes(C.STOP), "expected a STOP").toBeTruthy();
   expect(!cmds.includes(C.COLOR_CHANGE), "COLOR_CHANGE should be a STOP").toBeTruthy();
-  expect(p.threadlist.length).toBe(1); // STOP consumed the duplicate thread
+  expect(p.threadlist.length).toBe(1);
 });
 
 test("PES: distinct threads keep COLOR_CHANGE after read", () => {
@@ -253,8 +230,6 @@ test("PES: distinct threads keep COLOR_CHANGE after read", () => {
   expect(p.threadlist.length).toBe(2);
 });
 
-/* ------------------------------ robustness ---------------------------- */
-
 test("PES: truncated file (no PEC offset) throws a descriptive error", () => {
   const p = new EmbPattern();
   expect(() =>
@@ -264,6 +239,5 @@ test("PES: truncated file (no PEC offset) throws a descriptive error", () => {
 
 test("PES: #PES0001 with PEC offset beyond EOF throws (not hangs)", () => {
   const p = new EmbPattern();
-  // offset points past the end: readPec hits EOF in the header
   expect(() => readPesInto(new ByteReader(SIMPLE_PEC.subarray(0, 40)), p)).toThrow();
 });

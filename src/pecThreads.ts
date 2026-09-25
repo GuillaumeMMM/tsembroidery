@@ -1,7 +1,4 @@
-/**
- * Port of pyembroidery `EmbThreadPec.py` — the Brother PEC thread chart
- * (65 entries, indices 0-64, referenced by PEC color table bytes).
- */
+/** Brother PEC thread chart, indexed by PEC color bytes. */
 import { EmbThread } from "./thread.js";
 
 export class EmbThreadPec extends EmbThread {

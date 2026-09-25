@@ -1,6 +1,3 @@
-/**
- * Port of pyembroidery `EmbConstant.py`.
- */
 export const EmbConstant = {
   NO_COMMAND: -1,
   STITCH: 0,

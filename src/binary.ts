@@ -1,7 +1,3 @@
-/**
- * Port of pyembroidery `ReadHelper.py`
- */
-
 const WHENCE_SET = 0;
 const WHENCE_CUR = 1;
 const WHENCE_END = 2;
@@ -131,7 +127,7 @@ export function readString8(stream: ByteReader, length: number): string | null {
   try {
     return utf8Decoder.decode(bytes);
   } catch {
-    return null; // Must be > 128 chars.
+    return null;
   }
 }
 

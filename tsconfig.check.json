@@ -5,6 +5,7 @@
     "noEmit": true,
     "declaration": false,
     "allowImportingTsExtensions": true,
+    "types": ["node"],
   },
   "include": ["tests/**/*.ts"]
 }

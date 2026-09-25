@@ -147,7 +147,7 @@ test("writePes: encodes signed stitch boundaries", () => {
   source.stitchAbs(0, 0);
   source.stitch(63, -64);
   source.stitch(1984, -1984);
-  source.stitch(63, -64); // final deltas are +2047 / -2048
+  source.stitch(63, -64);
 
   const result = readPes(writePes(source));
   expect(result.stitches).toStrictEqual([

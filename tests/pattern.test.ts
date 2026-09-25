@@ -32,7 +32,6 @@ test("addCommand does NOT move the cursor", () => {
   p.stitchAbs(10, 20);
   p.addCommand(C.SEQUENCE_BREAK, 999, 999);
   p.stitch(5, 5);
-  // cursor still at (10, 20) after the positionless command
   expect(p.stitches[2]).toStrictEqual([15, 25, C.STITCH]);
   expect(p.stitches[1]).toStrictEqual([999, 999, C.SEQUENCE_BREAK]);
 });
@@ -88,14 +87,12 @@ test("count helpers", () => {
   expect(p.countStitchCommands(C.JUMP)).toBe(1);
 });
 
-/* ------------------------------ addThread ----------------------------- */
-
 test("addThread with an EmbThread instance", () => {
   const p = new EmbPattern();
   const t = thread(1, 2, 3);
   p.addThread(t);
   expect(p.threadlist.length).toBe(1);
-  expect(p.threadlist[0]).toBe(t); // same instance, identity preserved
+  expect(p.threadlist[0]).toBe(t);
 });
 
 test("addThread with a packed color number", () => {
@@ -128,8 +125,6 @@ test("addThread object spec: color string '#rrggbb'", () => {
   expect(p.threadlist[0].color).toBe(0xaabbcc);
 });
 
-/* ------------------------------- metadata ----------------------------- */
-
 test("metadata round-trip with getMetadata default", () => {
   const p = new EmbPattern();
   p.metadata("name", "Flowers");
@@ -137,8 +132,6 @@ test("metadata round-trip with getMetadata default", () => {
   expect(p.getMetadata("missing", "fallback")).toBe("fallback");
   expect(p.getMetadata("missing")).toBe(undefined);
 });
-
-/* --------------------------- filler threads --------------------------- */
 
 test("getThreadOrFiller returns stored thread when present", () => {
   const p = new EmbPattern();
@@ -153,13 +146,10 @@ test("filler thread is deterministic black but a FRESH instance each call", () =
   const b = p.getThreadOrFiller(0);
   expect(a.hexColor()).toBe("#000000");
   expect(b.hexColor()).toBe("#000000");
-  expect(a).not.toBe(b); // identity must differ, like python's random filler
+  expect(a).not.toBe(b);
 });
 
-/* ---------------------------- block iterators ------------------------- */
-
 function patternWithColors(): EmbPattern {
-  // stitches | color change | stitches | trim | stitches
   const p = new EmbPattern();
   p.addThread(thread(255, 0, 0));
   p.addThread(thread(0, 255, 0));
@@ -176,14 +166,10 @@ test("getAsStitchblock splits runs on non-stitch commands and swaps thread", () 
   const p = patternWithColors();
   const blocks = [...p.getAsStitchblock()];
   expect(blocks.length).toBe(3);
-  // first block: 2 stitches, thread 0 (red)
   expect(blocks[0][0].length).toBe(2);
   expect(blocks[0][1].hexColor()).toBe("#ff0000");
-  // second block: 1 stitch after color change -> thread 1 (green)
   expect(blocks[1][0].length).toBe(1);
   expect(blocks[1][1].hexColor()).toBe("#00ff00");
-  // third block: 1 stitch after trim -> same thread 1 (threadIndex advanced
-  // only on COLOR_CHANGE)
   expect(blocks[2][0].length).toBe(1);
   expect(blocks[2][1].hexColor()).toBe("#00ff00");
 });
@@ -196,8 +182,6 @@ test("getAsStitchblock on empty pattern yields nothing", () => {
 test("getAsCommandBlocks groups by command transitions", () => {
   const p = patternWithColors();
   const blocks = [...p.getAsCommandBlocks()];
-  // commands: STITCH STITCH COLOR_CHANGE STITCH TRIM STITCH
-  // -> groups: [s,s], [cc], [s], [trim], [s]
   expect(blocks.length).toBe(5);
   expect(blocks[0].length).toBe(2);
   expect(blocks[1].length).toBe(1);
@@ -208,8 +192,6 @@ test("getAsColorblocks splits at COLOR_CHANGE with threads", () => {
   const p = patternWithColors();
   const blocks = [...p.getAsColorblocks()];
   expect(blocks.length).toBe(2);
-  // python yields slices BETWEEN color changes: block 0 excludes the
-  // COLOR_CHANGE command itself (2 stitches), block 1 starts AT it (4).
   expect(blocks[0][0].length).toBe(2);
   expect(blocks[0][1].hexColor()).toBe("#ff0000");
   expect(blocks[1][0].length).toBe(4);
@@ -217,15 +199,12 @@ test("getAsColorblocks splits at COLOR_CHANGE with threads", () => {
   expect(blocks[1][1].hexColor()).toBe("#00ff00");
 });
 
-/* ---------------------------- conversions ----------------------------- */
-
 test("convertDuplicateColorChangeToStop: different thread keeps COLOR_CHANGE", () => {
   const p = patternWithColors();
   p.convertDuplicateColorChangeToStop();
   const commands = p.stitches.map((s) => s[2]);
   expect(commands.includes(C.COLOR_CHANGE)).toBeTruthy();
   expect(!commands.includes(C.STOP)).toBeTruthy();
-  // both threads preserved
   expect(p.threadlist.length).toBe(2);
 });
 
@@ -233,7 +212,7 @@ test("convertDuplicateColorChangeToStop: duplicate thread becomes STOP", () => {
   const p = new EmbPattern();
   const t = thread(1, 2, 3);
   p.addThread(t);
-  p.addThread(t); // same instance twice -> duplicate
+  p.addThread(t);
   p.stitchAbs(0, 0);
   p.colorChange();
   p.stitch(5, 5);
@@ -265,8 +244,6 @@ test("convertJumpsToTrim: jump run of >= 3 gets a TRIM, one merged JUMP left", (
   p.stitch(1, 0);
   p.convertJumpsToTrim(3);
   const commands = p.stitches.map((s) => s[2]);
-  // python keeps the LAST jump of the merged run (it re-adds
-  // stitches[i] after the trim), so: STITCH TRIM JUMP STITCH
   expect(commands).toStrictEqual([C.STITCH, C.TRIM, C.JUMP, C.STITCH]);
 });
 
@@ -278,10 +255,8 @@ test("convertJumpsToTrim: short jump run is kept as one jump", () => {
   p.stitch(1, 0);
   p.convertJumpsToTrim(3);
   const jumps = p.stitches.filter((s) => s[2] === C.JUMP);
-  expect(jumps.length).toBe(1); // merged run of 2 -> single final jump kept
+  expect(jumps.length).toBe(1);
 });
-
-/* ------------------------------ transforms ---------------------------- */
 
 test("translate moves every stitch", () => {
   const p = new EmbPattern();
@@ -298,6 +273,12 @@ test("moveCenterToOrigin centers extents on (0,0) with python rounding", () => {
   p.stitchAbs(10, 10);
   p.moveCenterToOrigin();
   expect(p.extents()).toStrictEqual({ minX: -5, minY: -5, maxX: 5, maxY: 5 });
+
+  const offset = new EmbPattern();
+  offset.stitchAbs(100, 200);
+  offset.stitchAbs(110, 220);
+  offset.moveCenterToOrigin();
+  expect(offset.extents()).toStrictEqual({ minX: -5, minY: -10, maxX: 5, maxY: 10 });
 });
 
 test("getSingletonThreadlist keeps only changed threads", () => {
@@ -310,8 +291,6 @@ test("getSingletonThreadlist keeps only changed threads", () => {
   expect(p.getSingletonThreadlist()).toStrictEqual([a, b]);
   expect(p.getUniqueThreadlist().length).toBe(2);
 });
-
-/* ------------------------------ stitchblocks -------------------------- */
 
 test("addStitchblock emits COLOR_BREAK for a new thread", () => {
   const p = new EmbPattern();
@@ -332,7 +311,7 @@ test("addStitchblock emits SEQUENCE_BREAK for the same thread", () => {
   const t = thread(5, 5, 5);
   const block: Stitch[] = [[0, 0, C.STITCH]];
   p.addStitchblock([block, t]);
-  p.addStitchblock([[[1, 1, C.STITCH]], t]); // same instance
+  p.addStitchblock([[[1, 1, C.STITCH]], t]);
   expect(p.stitches[0][2]).toBe(C.COLOR_BREAK);
   const secondBlockStart = p.stitches.findIndex(
     (s, i) => i > 0 && s[2] === C.SEQUENCE_BREAK
@@ -344,7 +323,7 @@ test("getStablePattern strips jumps/trims into breaks", () => {
   const p = new EmbPattern();
   p.addThread(thread(1, 2, 3));
   p.stitchAbs(0, 0);
-  p.move(10, 10); // jump noise
+  p.move(10, 10);
   p.stitch(5, 5);
   p.trim();
   p.stitch(2, 2);
@@ -376,14 +355,10 @@ test("fixColorCount pads threadlist to cover all color blocks", () => {
   p.colorChange();
   p.stitch(1, 1);
   p.fixColorCount();
-  // 3 stitch blocks opened by 2 color changes -> 3 threads
   expect(p.threadlist.length).toBe(3);
-  // idempotent
   p.fixColorCount();
   expect(p.threadlist.length).toBe(3);
 });
-
-/* ---------------------------- encoder options ------------------------- */
 
 test("append helpers add option/matrix commands at the cursor", () => {
   const p = new EmbPattern();
@@ -401,6 +376,5 @@ test("append helpers add option/matrix commands at the cursor", () => {
     C.OPTION_DISABLE_TIE_ON,
     C.OPTION_DISABLE_TIE_OFF,
   ]);
-  // MATRIX_TRANSLATE carried its x/y relative to the cursor (0,0)
   expect(p.stitches[1]).toStrictEqual([5, 6, C.MATRIX_TRANSLATE]);
 });
