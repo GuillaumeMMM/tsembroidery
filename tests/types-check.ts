@@ -41,6 +41,7 @@ const readSettings: SvgReadSettings = {
   rowSpacing: 0.4,
   pullCompensation: 0.2,
   underlay: true,
+  fit: true,
   colorTolerance: 10,
   onWarning: (message: string) => void message,
 };

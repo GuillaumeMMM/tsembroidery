@@ -231,7 +231,7 @@ test("readSvg: honors the root preserveAspectRatio attribute", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50" preserveAspectRatio="xMinYMin slice">
        <path d="M0 0L100 0" stroke="black" stroke-width="0.01"/>
      </svg>`,
-    { size: 50, stitchLength: 1000 }
+    { size: 50, stitchLength: 1000, fit: false }
   );
   const block = blocks(pattern)[0][0];
   expect(block[0]).toStrictEqual([0, 0, C.STITCH]);
@@ -670,6 +670,27 @@ const midpointsIn = (segments: (readonly [number[], number[]])[], [x0, y0, x1, y
     return mx > x0 && mx < x1 && my > y0 && my < y1;
   }).length;
 
+test("readSvg: fits pull compensation, edge strokes and overflowing content into the size square", () => {
+  const source = svg100(`
+    <rect x="0" y="0" width="100" height="100" fill="#ff0000"/>
+    <path d="M-20 50H50" stroke="#000000" stroke-width="4" fill="none"/>`);
+  const inside = ({ minX, minY, maxX, maxY }: ReturnType<EmbPattern["extents"]>) =>
+    minX >= 0 && minY >= 0 && maxX <= 1000 && maxY <= 1000;
+  expect(inside(readSvg(source, { fit: false }).extents())).toBe(false);
+  const fitted = readSvg(source).extents();
+  expect(inside(fitted)).toBe(true);
+  expect(fitted.maxX - fitted.minX).toBeCloseTo(1000, 6);
+});
+
+test("readSvg: fitting moves a design that fits but sits outside the square, without scaling it", () => {
+  const source = svg100(`<rect x="-30" y="10" width="20" height="20" fill="#ff0000"/>`);
+  const loose = readSvg(source, { fit: false, pullCompensation: 0 }).extents();
+  const fitted = readSvg(source, { pullCompensation: 0 }).extents();
+  expect(fitted.minX).toBeCloseTo(0, 6);
+  expect(fitted.maxX - fitted.minX).toBeCloseTo(loose.maxX - loose.minX, 6);
+  expect([fitted.minY, fitted.maxY]).toStrictEqual([loose.minY, loose.maxY]);
+});
+
 test("readSvg: does not stitch fill hidden under a later shape", () => {
   const segments = segmentsByColor(readSvg(svg100(`
     <rect x="0" y="0" width="40" height="40" fill="#ff0000"/>
@@ -683,7 +704,7 @@ test("readSvg: satin strokes hide the fills below them, including their own", ()
   const segments = segmentsByColor(readSvg(svg100(`
     <rect x="0" y="0" width="40" height="40" fill="#ff0000"/>
     <path d="M0 20H40" stroke="#000000" stroke-width="6" fill="none"/>
-    <rect x="50" y="0" width="40" height="40" fill="#00ff00" stroke="#0000ff" stroke-width="6"/>`)));
+    <rect x="50" y="0" width="40" height="40" fill="#00ff00" stroke="#0000ff" stroke-width="6"/>`), { fit: false }));
   // The black band covers y 17..23 mm; the blue border covers 3 mm inside the green square.
   expect(midpointsIn(segments.get("#ff0000")!, [5, 175, 395, 225])).toBe(0);
   expect(midpointsIn(segments.get("#00ff00")!, [500, 0, 900, 25])).toBe(0);

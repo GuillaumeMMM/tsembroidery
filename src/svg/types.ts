@@ -68,6 +68,8 @@ export interface SvgReadSettings {
   rowSpacing?: number;
   /** Colors closer than this (red-mean distance, 0-765) share one thread. Default 10; 0 merges exact matches only. */
   colorTolerance?: number;
+  /** Shrinks and moves the stitches, if needed, so the design stays inside the `size` square: pull compensation, strokes on the edge and content outside the viewBox can overflow it. Default true. */
+  fit?: boolean;
   /** Small back-and-forth stitches added wherever the thread is cut (both sides of jumps and color changes), so it holds. Default 0. */
   tieStitches?: number;
   /** Maximum nesting of `<use>` references. Default 32. */

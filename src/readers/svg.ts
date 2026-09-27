@@ -40,6 +40,21 @@ function tie(stitches: Stitch[], count: number): Stitch[] {
   ];
 }
 
+/** Shrinks and moves the stitches, if needed, so they stay inside the `limit`×`limit` square at the origin. */
+function fitInto(pattern: EmbPattern, limit: number): void {
+  const { minX, minY, maxX, maxY } = pattern.extents();
+  const scale = Math.min(1, limit / Math.max(maxX - minX, maxY - minY));
+  const fit = (min: number, max: number) => {
+    const half = ((max - min) * scale) / 2;
+    return [(min + max) / 2, Math.min(Math.max((min + max) / 2, half), limit - half)];
+  };
+  const [[cx, nx], [cy, ny]] = [fit(minX, maxX), fit(minY, maxY)];
+  for (const stitch of pattern.stitches) {
+    stitch[0] = nx + (stitch[0] - cx) * scale;
+    stitch[1] = ny + (stitch[1] - cy) * scale;
+  }
+}
+
 /** Fills become tatami and strokes running or satin stitches; hidden parts are dropped and colors grouped. */
 export function readSvg(
   input: SvgInput,
@@ -58,6 +73,7 @@ export function readSvg(
   }
   const normalized = normalizeSvg(decodeSvgInput(input), settings);
   normalized.warnings.forEach((warning) => settings.onWarning?.(warning));
+  const fit = settings.fit ?? true;
   const pattern = new EmbPattern();
   // Each run between jumps becomes its own block, so the thread is trimmed before every jump.
   const runs = planStitches(normalized.shapes, stitchOptions).flatMap(([stitches, thread]) => {
@@ -74,6 +90,7 @@ export function readSvg(
   // Ends like any other block, with a trim.
   const [x, y] = pattern.stitches[pattern.stitches.length - 1];
   pattern.addCommand(EmbConstant.SEQUENCE_BREAK, x, y);
+  if (fit) fitInto(pattern, normalized.viewport.targetSize);
   return pattern;
 }
 

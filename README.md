@@ -52,6 +52,7 @@ Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in t
 | `stitchLength`     | `2.5`   | Longest running stitch, in mm.                                                                               |
 | `rowSpacing`       | `0.4`   | Gap between parallel stitches in fills and satin, in mm.                                                     |
 | `pullCompensation` | `0.2`   | Fills and satin are widened by this much on each side, in mm, so seams stay closed when the fabric pulls in. |
+| `fit`              | `true`  | Shrink and move the stitches if needed so the design stays inside the `size` square (pull compensation, strokes on the edge and content outside the viewBox can overflow it). |
 | `underlay`         | `true`  | Stitch a holding layer under fills and satin first.                                                          |
 | `tieStitches`      | `0`     | Small back-and-forth stitches added wherever the thread is cut (start, end, both sides of jumps and color changes) so it holds. `2` or more locks the start too. |
 | `colorTolerance`   | `10`    | Colors closer than this (0–765) share one thread. `0` keeps every distinct color.                            |
