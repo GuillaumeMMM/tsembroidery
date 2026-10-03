@@ -37,7 +37,8 @@ const preview: string = writeSvg(readPes(pes), { stable: true });
 const input: SvgInput = new TextEncoder().encode("<svg></svg>");
 const readSettings: SvgReadSettings = {
   size: 100,
-  stitchLength: 2.5,
+  runningStitchLength: 2.5,
+  fillStitchLength: 3,
   rowSpacing: 0.4,
   pullCompensation: 0.2,
   underlay: true,

@@ -55,17 +55,18 @@ globalThis.DOMParser = new Window().DOMParser;
 
 ### `readSvg` `SvgReadSettings` settings
 
-| Setting            | Default | Description                                                                                                                                                                   |
-| ------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `size`             | `100`   | Edge in mm of the square the SVG's viewBox is fitted into.                                                                                                                    |
-| `stitchLength`     | `2.5`   | Longest running stitch, in mm.                                                                                                                                                |
-| `rowSpacing`       | `0.4`   | Gap between parallel stitches in fills and satin, in mm.                                                                                                                      |
-| `pullCompensation` | `0.2`   | Fills and satin are widened by this much on each side, in mm, so seams stay closed when the fabric pulls in.                                                                  |
-| `fit`              | `true`  | Shrink and move the stitches if needed so the design stays inside the `size` square (pull compensation, strokes on the edge and content outside the viewBox can overflow it). |
-| `underlay`         | `true`  | Stitch a holding layer under fills and satin first.                                                                                                                           |
-| `tieStitches`      | `0`     | Small back-and-forth stitches added wherever the thread is cut (start, end, both sides of jumps and color changes) so it holds. `2` or more locks the start too.              |
-| `colorTolerance`   | `10`    | Colors closer than this (0–765) share one thread. `0` keeps every distinct color.                                                                                             |
-| `flattenTolerance` | `0.05`  | Maximum error when curves are turned into lines, in mm.                                                                                                                       |
+| Setting               | Default | Description                                                                                                                                                                                          |
+| --------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `size`                | `100`   | Edge in mm of the square the SVG's viewBox is fitted into.                                                                                                                                           |
+| `runningStitchLength` | `2.5`   | Longest stitch along lines, in mm: thin strokes, the satin underlay and travel inside fills. Straight parts are split into equal stitches; corners and curves are kept, so the shape doesn't change. |
+| `fillStitchLength`    | `3`     | Longest stitch in fill rows, in mm. Shorter is sturdier, longer is softer and faster to sew.                                                                                                         |
+| `rowSpacing`          | `0.4`   | Gap between parallel stitches in fills and satin, in mm.                                                                                                                                             |
+| `pullCompensation`    | `0.2`   | Fills and satin are widened by this much on each side, in mm, so seams stay closed when the fabric pulls in.                                                                                         |
+| `fit`                 | `true`  | Shrink and move the stitches if needed so the design stays inside the `size` square (pull compensation, strokes on the edge and content outside the viewBox can overflow it).                        |
+| `underlay`            | `true`  | Stitch a holding layer under fills and satin first.                                                                                                                                                  |
+| `tieStitches`         | `0`     | Small back-and-forth stitches added wherever the thread is cut (start, end, both sides of jumps and color changes) so it holds. `2` or more locks the start too.                                     |
+| `colorTolerance`      | `10`    | Colors closer than this (0–765) share one thread. `0` keeps every distinct color.                                                                                                                    |
+| `flattenTolerance`    | `0.05`  | Maximum error when curves are turned into lines, in mm.                                                                                                                                              |
 
 ### Writing settings
 

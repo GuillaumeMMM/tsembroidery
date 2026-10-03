@@ -8,12 +8,19 @@ export interface Rows {
   /** Row direction in degrees. */
   angle: number;
   spacing: number;
+  /** Longest stitch along a row. */
+  stitchLength: number;
 }
 
+/** Hidden under the fill, so its stitch length is fixed. */
+const UNDERLAY_STITCH = 3 * UNITS_PER_MM;
 /** Sparse rows across the fill, to hold the fabric before it. */
-const UNDERLAY_ROWS: Rows = { angle: -45, spacing: 2 * UNITS_PER_MM };
+const UNDERLAY_ROWS: Rows = {
+  angle: -45,
+  spacing: 2 * UNITS_PER_MM,
+  stitchLength: UNDERLAY_STITCH,
+};
 const UNDERLAY_INSET = 0.5 * UNITS_PER_MM;
-const MAX_STITCH = 3 * UNITS_PER_MM;
 const MIN_STITCH = 0.5 * UNITS_PER_MM;
 const STAGGERS = 4;
 
@@ -34,7 +41,10 @@ type Section = Segment[];
 type Graph = [neighbor: number, weight: number][][];
 
 /** Scanline crossings (rows on a global grid) and a travel graph of outline edges plus row lines. */
-function buildRows(rings: Point2[][], spacing: number): { segments: Segment[][]; graph: Graph; nodes: Point2[] } {
+function buildRows(
+  rings: Point2[][],
+  spacing: number,
+): { segments: Segment[][]; graph: Graph; nodes: Point2[] } {
   const nodes: Point2[] = [];
   const graph: Graph = [];
   const addNode = (point: Point2): number => {
@@ -59,7 +69,11 @@ function buildRows(rings: Point2[][], spacing: number): { segments: Segment[][];
       const high = Math.max(p.y, q.y);
       const edgeCrossings: (Crossing & { t: number })[] = [];
       // Half-open [low, high) so a row through a vertex is counted once.
-      for (let row = Math.ceil(low / spacing - 0.5); (row + 0.5) * spacing < high; row += 1) {
+      for (
+        let row = Math.ceil(low / spacing - 0.5);
+        (row + 0.5) * spacing < high;
+        row += 1
+      ) {
         const y = (row + 0.5) * spacing;
         if (y < low) continue;
         const t = (y - p.y) / (q.y - p.y);
@@ -69,21 +83,27 @@ function buildRows(rings: Point2[][], spacing: number): { segments: Segment[][];
         if (!rows.has(row)) rows.set(row, []);
         rows.get(row)!.push(crossing);
       }
-      edgeCrossings.sort((c1, c2) => c1.t - c2.t).forEach((crossing) => ringNodes.push(crossing.id));
+      edgeCrossings
+        .sort((c1, c2) => c1.t - c2.t)
+        .forEach((crossing) => ringNodes.push(crossing.id));
     });
-    ringNodes.forEach((node, index) => link(node, ringNodes[(index + 1) % ringNodes.length]));
+    ringNodes.forEach((node, index) =>
+      link(node, ringNodes[(index + 1) % ringNodes.length]),
+    );
   }
 
-  const segments = [...rows.keys()].sort((r1, r2) => r1 - r2).map((row) => {
-    const crossings = rows.get(row)!.sort((c1, c2) => c1.x - c2.x);
-    const rowSegments: Segment[] = [];
-    for (let index = 0; index + 1 < crossings.length; index += 2) {
-      const [a, b] = [crossings[index], crossings[index + 1]];
-      link(a.id, b.id);
-      rowSegments.push({ row, a, b });
-    }
-    return rowSegments;
-  });
+  const segments = [...rows.keys()]
+    .sort((r1, r2) => r1 - r2)
+    .map((row) => {
+      const crossings = rows.get(row)!.sort((c1, c2) => c1.x - c2.x);
+      const rowSegments: Segment[] = [];
+      for (let index = 0; index + 1 < crossings.length; index += 2) {
+        const [a, b] = [crossings[index], crossings[index + 1]];
+        link(a.id, b.id);
+        rowSegments.push({ row, a, b });
+      }
+      return rowSegments;
+    });
   return { segments, graph, nodes };
 }
 
@@ -96,9 +116,12 @@ function buildSections(rows: Segment[][]): Section[] {
     const overlaps = (s: Segment, t: Segment) =>
       Math.abs(s.row - t.row) === 1 && s.a.x < t.b.x && t.a.x < s.b.x;
     for (const segment of row) {
-      const above = previous.filter((entry) => overlaps(entry.segment, segment));
+      const above = previous.filter((entry) =>
+        overlaps(entry.segment, segment),
+      );
       const unique =
-        above.length === 1 && row.filter((other) => overlaps(above[0].segment, other)).length === 1;
+        above.length === 1 &&
+        row.filter((other) => overlaps(above[0].segment, other)).length === 1;
       const section = unique ? above[0].section : [];
       if (!unique) sections.push(section);
       section.push(segment);
@@ -109,12 +132,16 @@ function buildSections(rows: Segment[][]): Section[] {
   return sections;
 }
 
-function shortestPaths(graph: Graph, source: number): { distance: Float64Array; previous: Int32Array } {
+function shortestPaths(
+  graph: Graph,
+  source: number,
+): { distance: Float64Array; previous: Int32Array } {
   const distance = new Float64Array(graph.length).fill(Infinity);
   const previous = new Int32Array(graph.length).fill(-1);
   const heap: [number, number][] = [[0, source]];
   distance[source] = 0;
-  const swap = (i: number, j: number) => ([heap[i], heap[j]] = [heap[j], heap[i]]);
+  const swap = (i: number, j: number) =>
+    ([heap[i], heap[j]] = [heap[j], heap[i]]);
   while (heap.length > 0) {
     const [cost, node] = heap[0];
     const last = heap.pop()!;
@@ -150,13 +177,24 @@ function shortestPaths(graph: Graph, source: number): { distance: Float64Array; 
 }
 
 /** Needle points along a row, on a staggered global grid so no lines form across rows. */
-function rowPoints(row: number, from: number, to: number, y: number): Point2[] {
-  const offset = ((((row % STAGGERS) + STAGGERS) % STAGGERS) / STAGGERS) * MAX_STITCH;
+function rowPoints(
+  row: number,
+  from: number,
+  to: number,
+  y: number,
+  length: number,
+): Point2[] {
+  const offset =
+    ((((row % STAGGERS) + STAGGERS) % STAGGERS) / STAGGERS) * length;
   const low = Math.min(from, to);
   const high = Math.max(from, to);
   const grid: number[] = [];
-  for (let k = Math.ceil((low + MIN_STITCH - offset) / MAX_STITCH); k * MAX_STITCH + offset <= high - MIN_STITCH; k += 1) {
-    grid.push(k * MAX_STITCH + offset);
+  for (
+    let k = Math.ceil((low + MIN_STITCH - offset) / length);
+    k * length + offset <= high - MIN_STITCH;
+    k += 1
+  ) {
+    grid.push(k * length + offset);
   }
   if (to < from) grid.reverse();
   return [from, ...grid, to].map((x) => ({ x, y }));
@@ -168,15 +206,24 @@ function entries(section: Section): Crossing[] {
   return [first.a, first.b, last.a, last.b];
 }
 
-function stitchSection(section: Section, entry: Crossing, out: Point2[]): Crossing {
+function stitchSection(
+  section: Section,
+  entry: Crossing,
+  out: Point2[],
+  length: number,
+): Crossing {
   const forward = entry === section[0].a || entry === section[0].b;
   const rows = forward ? section : [...section].reverse();
   let fromA = entry === rows[0].a;
   let exit = entry;
   for (const segment of rows) {
-    const [start, end] = fromA ? [segment.a, segment.b] : [segment.b, segment.a];
-    appendLine(out, [start], MAX_STITCH);
-    out.push(...rowPoints(segment.row, start.x, end.x, start.y).slice(1));
+    const [start, end] = fromA
+      ? [segment.a, segment.b]
+      : [segment.b, segment.a];
+    appendLine(out, [start], length);
+    out.push(
+      ...rowPoints(segment.row, start.x, end.x, start.y, length).slice(1),
+    );
     exit = end;
     fromA = !fromA;
   }
@@ -189,7 +236,9 @@ function appendLine(out: Point2[], points: Point2[], maxLength: number): void {
     points = points.slice(1);
   }
   if (points.length === 0) return;
-  out.push(...resample([out[out.length - 1], ...points], false, maxLength).slice(1));
+  out.push(
+    ...resample([out[out.length - 1], ...points], false, maxLength).slice(1),
+  );
 }
 
 /** Tatami of `region`, section by section, travelling inside the shape between them. Starts near `from`. */
@@ -197,12 +246,18 @@ export function tatami(
   region: Ring[],
   travelLength: number,
   from: Point2 | null = null,
-  { angle, spacing }: Rows
+  { angle, spacing, stitchLength }: Rows,
 ): Stitch[] {
   const cos = Math.cos((angle * Math.PI) / 180);
   const sin = Math.sin((angle * Math.PI) / 180);
-  const toRowSpace = (p: Point2): Point2 => ({ x: p.x * cos + p.y * sin, y: p.y * cos - p.x * sin });
-  const fromRowSpace = (p: Point2): Point2 => ({ x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos });
+  const toRowSpace = (p: Point2): Point2 => ({
+    x: p.x * cos + p.y * sin,
+    y: p.y * cos - p.x * sin,
+  });
+  const fromRowSpace = (p: Point2): Point2 => ({
+    x: p.x * cos - p.y * sin,
+    y: p.x * sin + p.y * cos,
+  });
   const rings = region.map((ring) => ring.map(toRowSpace));
   const { segments, graph, nodes } = buildRows(rings, spacing);
   const sections = buildSections(segments);
@@ -217,12 +272,14 @@ export function tatami(
   };
   const nearestEntry = (point: Point2, candidates: Iterable<Section>) =>
     [...candidates]
-      .flatMap((section) => entries(section).map((crossing) => [section, crossing] as const))
+      .flatMap((section) =>
+        entries(section).map((crossing) => [section, crossing] as const),
+      )
       .reduce((closest, pair) =>
         Math.hypot(pair[1].x - point.x, pair[1].y - point.y) <
         Math.hypot(closest[1].x - point.x, closest[1].y - point.y)
           ? pair
-          : closest
+          : closest,
       );
 
   const remaining = new Set(sections);
@@ -234,7 +291,10 @@ export function tatami(
     let section: Section;
     let entry: Crossing;
     if (current === null) {
-      [section, entry] = from === null ? [sections[0], sections[0][0].a] : nearestEntry(toRowSpace(from), sections);
+      [section, entry] =
+        from === null
+          ? [sections[0], sections[0][0].a]
+          : nearestEntry(toRowSpace(from), sections);
     } else {
       const { distance, previous } = shortestPaths(graph, current.id);
       let best = Infinity;
@@ -247,7 +307,8 @@ export function tatami(
       }
       if (Number.isFinite(best)) {
         const route: Point2[] = [];
-        for (let node = entry.id; node !== -1; node = previous[node]) route.unshift(nodes[node]);
+        for (let node = entry.id; node !== -1; node = previous[node])
+          route.unshift(nodes[node]);
         appendLine(out, route, travelLength);
       } else {
         [section, entry] = nearestEntry(current, remaining);
@@ -257,7 +318,7 @@ export function tatami(
         alreadyStitched = 0;
       }
     }
-    current = stitchSection(section, entry, out);
+    current = stitchSection(section, entry, out, stitchLength);
     remaining.delete(section);
     emit(out.slice(alreadyStitched), EmbConstant.STITCH);
   }
@@ -268,24 +329,41 @@ export function tatami(
 export function fillStitches(
   region: Ring[],
   options: Required<PathStitchOptions>,
-  from: Point2 | null = null
+  from: Point2 | null = null,
 ): Stitch[] {
-  const travelLength = options.stitchLength * UNITS_PER_MM;
-  const fillRegion = offsetRegion(region, options.pullCompensation * UNITS_PER_MM);
-  const rows: Rows = { angle: 45, spacing: options.rowSpacing * UNITS_PER_MM };
+  const travelLength = options.runningStitchLength * UNITS_PER_MM;
+  const fillRegion = offsetRegion(
+    region,
+    options.pullCompensation * UNITS_PER_MM,
+  );
+  const rows: Rows = {
+    angle: 45,
+    spacing: options.rowSpacing * UNITS_PER_MM,
+    stitchLength: options.fillStitchLength * UNITS_PER_MM,
+  };
   const underlay = options.underlay
-    ? tatami(offsetRegion(region, -UNDERLAY_INSET), travelLength, from, UNDERLAY_ROWS)
+    ? tatami(
+        offsetRegion(region, -UNDERLAY_INSET),
+        travelLength,
+        from,
+        UNDERLAY_ROWS,
+      )
     : [];
-  if (underlay.length === 0) return tatami(fillRegion, travelLength, from, rows);
+  if (underlay.length === 0)
+    return tatami(fillRegion, travelLength, from, rows);
 
   const [x, y] = underlay[underlay.length - 1];
   const fill = tatami(fillRegion, travelLength, { x, y }, rows);
   if (fill.length === 0) return underlay;
   const start = { x: fill[0][0], y: fill[0][1] };
   // Stitch straight to the fill when that stays inside the shape, otherwise jump.
-  const inside = clipLines([{ points: [{ x, y }, start], closed: false }], fillRegion).length === 0;
+  const inside =
+    clipLines([{ points: [{ x, y }, start], closed: false }], fillRegion)
+      .length === 0;
   const link: Stitch[] = inside
-    ? resample([{ x, y }, start], false, MAX_STITCH).slice(1, -1).map((p) => [p.x, p.y, EmbConstant.STITCH])
+    ? resample([{ x, y }, start], false, UNDERLAY_STITCH)
+        .slice(1, -1)
+        .map((p) => [p.x, p.y, EmbConstant.STITCH])
     : [[start.x, start.y, EmbConstant.JUMP]];
   return [...underlay, ...link, ...fill];
 }

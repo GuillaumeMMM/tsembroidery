@@ -15,7 +15,8 @@ export interface FlatPathSubpath {
 
 /** Lengths in mm. */
 export interface PathStitchOptions {
-  stitchLength?: number;
+  runningStitchLength?: number;
+  fillStitchLength?: number;
   flattenTolerance?: number;
   underlay?: boolean;
   pullCompensation?: number;
@@ -150,14 +151,18 @@ export function resolvePathStitchOptions(
   options: PathStitchOptions = {}
 ): Required<PathStitchOptions> {
   const {
-    stitchLength = 2.5,
+    runningStitchLength = 2.5,
+    fillStitchLength = 3,
     flattenTolerance = 0.05,
     underlay = true,
     pullCompensation = 0.2,
     rowSpacing = 0.4,
   } = options;
-  if (!Number.isFinite(stitchLength) || stitchLength <= 0) {
-    throw new RangeError("SVG stitch length must be a positive finite number");
+  if (!Number.isFinite(runningStitchLength) || runningStitchLength <= 0) {
+    throw new RangeError("SVG running stitch length must be a positive finite number");
+  }
+  if (!Number.isFinite(fillStitchLength) || fillStitchLength <= 0) {
+    throw new RangeError("SVG fill stitch length must be a positive finite number");
   }
   if (!Number.isFinite(flattenTolerance) || flattenTolerance <= 0) {
     throw new RangeError("SVG flatten tolerance must be a positive finite number");
@@ -168,7 +173,7 @@ export function resolvePathStitchOptions(
   if (!Number.isFinite(rowSpacing) || rowSpacing <= 0) {
     throw new RangeError("SVG row spacing must be a positive finite number");
   }
-  return { stitchLength, flattenTolerance, underlay, pullCompensation, rowSpacing };
+  return { runningStitchLength, fillStitchLength, flattenTolerance, underlay, pullCompensation, rowSpacing };
 }
 
 /** Stroke width in pattern units, after the shape's transform. */
@@ -182,7 +187,7 @@ export function strokePoints(
   width: number,
   options: Required<PathStitchOptions>
 ): Point2[] {
-  const run = resample(line.points, line.closed, options.stitchLength * UNITS_PER_MM);
+  const run = resample(line.points, line.closed, options.runningStitchLength * UNITS_PER_MM);
   if (width < SATIN_MIN_WIDTH) return run;
   width += 2 * options.pullCompensation * UNITS_PER_MM;
   const spacing = options.rowSpacing * UNITS_PER_MM;

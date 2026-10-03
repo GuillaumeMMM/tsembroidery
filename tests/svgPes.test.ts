@@ -53,7 +53,7 @@ test("readSvg + writePes: serializes parsed SVG stitches", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
        <path d="M0 0L10 0" stroke="#ff0000" fill="none"/>
      </svg>`,
-    { stitchLength: 1000 }
+    { runningStitchLength: 1000 }
   );
   const bytes = writePes(pattern);
 

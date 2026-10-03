@@ -67,7 +67,8 @@ export function readSvg(
   settings: SvgReadSettings = {}
 ): SvgReadResult {
   const stitchOptions = resolvePathStitchOptions({
-    stitchLength: settings.stitchLength,
+    runningStitchLength: settings.runningStitchLength,
+    fillStitchLength: settings.fillStitchLength,
     flattenTolerance: settings.flattenTolerance,
     underlay: settings.underlay,
     pullCompensation: settings.pullCompensation,

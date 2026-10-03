@@ -56,8 +56,10 @@ export interface SvgReadSettings {
   size?: number;
   /** How the viewBox fits the square, as in SVG. Default "xMidYMid meet". */
   preserveAspectRatio?: string;
-  /** Max running stitch length, in mm. Default 2.5. */
-  stitchLength?: number;
+  /** Longest stitch of running stitches (thin strokes, satin underlay, travel inside fills), in mm. Straight parts are split into equal stitches; corners and curves are kept. Default 2.5. */
+  runningStitchLength?: number;
+  /** Longest stitch in fill rows, in mm. Default 3. */
+  fillStitchLength?: number;
   /** Maximum error when turning curves into lines, in mm. Default 0.05. */
   flattenTolerance?: number;
   /** First layer under fills (sparse rows across) and satin (center walk). Default true. */
