@@ -167,9 +167,14 @@ function shapePath(element: Element, tag: string): SVGPathData | string | null {
   }
 }
 
+// Only core DOM calls from here on, so minimal DOMs (xmldom in a worker) work too.
+function childElements(element: Element): Element[] {
+  return Array.from(element.childNodes).filter((node): node is Element => node.nodeType === 1);
+}
+
 function collectIds(root: Element): Map<string, Element> {
   const ids = new Map<string, Element>();
-  for (const element of [root, ...Array.from(root.querySelectorAll("[id]"))]) {
+  for (const element of [root, ...Array.from(root.getElementsByTagName("*"))]) {
     const id = element.getAttribute("id");
     if (id !== null && !ids.has(id)) ids.set(id, element);
   }
@@ -259,7 +264,7 @@ function collectShapes(
       gradients.set(id, null);
       return null;
     }
-    const stops = Array.from(element.children).filter(
+    const stops = childElements(element).filter(
       (child) => localName(child) === "stop",
     );
     let color: EmbThread | null;
@@ -389,7 +394,7 @@ function collectShapes(
         rule: rule?.toLowerCase() === "evenodd" ? "evenodd" : "nonzero",
       });
     };
-    for (const child of Array.from(clip.children)) add(child, base, 0);
+    for (const child of childElements(clip)) add(child, base, 0);
     return parts;
   };
 
@@ -486,7 +491,7 @@ function collectShapes(
 
     if (IGNORED_TAGS.has(tag) || (tag === "symbol" && !allowSymbol)) return;
     if (CONTAINER_TAGS.has(tag)) {
-      for (const child of Array.from(element.children)) {
+      for (const child of childElements(element)) {
         visit(child, transform, style, clips, useDepth, visiting, allowSymbol);
       }
       return;
