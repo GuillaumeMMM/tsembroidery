@@ -56,6 +56,24 @@ export class ByteWriter {
     this.offset += 4;
   }
 
+  writeUint16be(value: number): void {
+    this.ensure(this.offset + 2);
+    this.view.setUint16(this.offset, value & 0xffff, false);
+    this.offset += 2;
+  }
+
+  writeUint24be(value: number): void {
+    this.writeUint8((value >> 16) & 0xff);
+    this.writeUint8((value >> 8) & 0xff);
+    this.writeUint8(value & 0xff);
+  }
+
+  writeUint32be(value: number): void {
+    this.ensure(this.offset + 4);
+    this.view.setUint32(this.offset, value >>> 0, false);
+    this.offset += 4;
+  }
+
   writeFloat32le(value: number): void {
     this.ensure(this.offset + 4);
     this.view.setFloat32(this.offset, value, true);

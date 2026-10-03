@@ -1,4 +1,5 @@
 import { EmbConstant, type Command } from "./constants.js";
+import { pyRound } from "./pyMath.js";
 import type { EmbPattern, Stitch } from "./pattern.js";
 import {
   getIdentity,
@@ -65,6 +66,8 @@ export interface EncoderSettings {
   max_jump?: number;
   /** Always jump all the way to the next block's start. */
   full_jump?: boolean;
+  /** Round positions to whole units before encoding. */
+  round?: boolean;
   strip_sequins?: boolean;
   /** An `EmbConstant.CONTINGENCY_SEQUIN_*` value. */
   sequin_contingency?: number;
@@ -92,6 +95,7 @@ export class Transcoder {
   maxStitch: number;
   maxJump: number;
   fullJump: boolean;
+  round: boolean;
   sequinContingency: number;
   stripSpeeds: boolean;
   explicitTrim: boolean;
@@ -114,6 +118,7 @@ export class Transcoder {
     this.maxStitch = settings.max_stitch ?? Infinity;
     this.maxJump = settings.max_jump ?? Infinity;
     this.fullJump = settings.full_jump ?? false;
+    this.round = settings.round ?? false;
     const stripSequins = settings.strip_sequins ?? true;
     let sequinContingency: number = stripSequins
       ? CONTINGENCY_SEQUIN_UTILIZE
@@ -240,8 +245,8 @@ export class Transcoder {
       this.position = index;
       this.stitch = stitch;
       const p = pointInMatrixSpace(this.matrix, stitch);
-      const x = p[0];
-      const y = p[1];
+      const x = this.round ? pyRound(p[0]) : p[0];
+      const y = this.round ? pyRound(p[1]) : p[1];
       // x/y are transformed; flags and option values come from the raw stitch.
       flags = stitch[2];
 

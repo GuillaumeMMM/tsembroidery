@@ -54,6 +54,7 @@ export function writePes(
       encodeSettings.max_stitch = MAX_PES_DELTA;
     }
     if (encodeSettings.full_jump === undefined) encodeSettings.full_jump = true;
+    if (encodeSettings.round === undefined) encodeSettings.round = true;
     if (encodeSettings.sequin_contingency === undefined) {
       encodeSettings.sequin_contingency = CONTINGENCY_SEQUIN_JUMP;
     }

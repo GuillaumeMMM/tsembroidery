@@ -46,6 +46,7 @@ export const EmbConstant = {
   CONTINGENCY_SEQUIN_REMOVE: 0xf8,
 
   COMMAND_MASK: 0xff,
+  FLAGS_MASK: 0xff00,
 } as const;
 
 export type Command = (typeof EmbConstant)[keyof typeof EmbConstant];

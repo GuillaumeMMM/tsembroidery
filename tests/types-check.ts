@@ -1,8 +1,30 @@
 // Compiled by `npm run typecheck` against the published declarations in dist/.
-import { EmbConstant, EmbPattern, EmbThread, readDst, readPes, readSvg, writeDst, writePes, writeSvg } from "../dist/index.js";
+import {
+  EmbConstant,
+  EmbPattern,
+  EmbThread,
+  readDst,
+  readExp,
+  readJef,
+  readPes,
+  readSvg,
+  readVp3,
+  readXxx,
+  writeDst,
+  writeExp,
+  writeJef,
+  writePes,
+  writeSvg,
+  writeVp3,
+  writeXxx,
+} from "../dist/index.js";
 import type {
   Command,
   DstWriteSettings,
+  ExpWriteSettings,
+  JefWriteSettings,
+  Vp3WriteSettings,
+  XxxWriteSettings,
   EncoderSettings,
   Extents,
   PesWriteSettings,
@@ -29,6 +51,16 @@ const pes: Uint8Array = writePes(pattern, pesSettings);
 const dstSettings: DstWriteSettings = { extendedHeader: true, max_stitch: 100 };
 const dst: Uint8Array = writeDst(readSvg("<svg/>").pattern, dstSettings);
 const fromDst: EmbPattern = readDst(dst);
+const jefSettings: JefWriteSettings = { trims: true, trimAt: 3, date: "20260101120000", round: true };
+const expSettings: ExpWriteSettings = { encode: true };
+const vp3Settings: Vp3WriteSettings = { max_stitch: 200 };
+const xxxSettings: XxxWriteSettings = { full_jump: false };
+const others: EmbPattern[] = [
+  readJef(writeJef(pattern, jefSettings)),
+  readExp(writeExp(pattern, expSettings)),
+  readVp3(writeVp3(pattern, vp3Settings)),
+  readXxx(writeXxx(pattern, xxxSettings)),
+];
 
 const svgWriteSettings: SvgWriteSettings = { stable: false };
 const svg: string = writeSvg(normalized, svgWriteSettings);
@@ -60,4 +92,4 @@ writePes(pattern, { maxStitch: 10 });
 // @ts-expect-error unknown settings are rejected
 readSvg("<svg/>", { spacing: 1 });
 
-void [svg, preview, converted, warnings, stitch, blocks, extents, fromDst];
+void [svg, preview, converted, warnings, others, stitch, blocks, extents, fromDst];

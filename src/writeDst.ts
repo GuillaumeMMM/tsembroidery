@@ -111,6 +111,7 @@ export function writeDst(source: EmbPattern, settings: DstWriteSettings = {}): U
         max_jump: MAX_DELTA,
         max_stitch: MAX_DELTA,
         full_jump: false,
+        round: true,
         // As in current pyembroidery: the machine handles the thread change, no trim needed.
         explicit_trim: false,
         sequin_contingency: EmbConstant.CONTINGENCY_SEQUIN_UTILIZE,

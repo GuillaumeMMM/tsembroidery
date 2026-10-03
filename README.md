@@ -1,8 +1,15 @@
 # tsembroidery
 
-Read and write Brother `.pes` and Tajima `.dst` embroidery files, and turn SVG files into `.pes` or `.dst` files. Based on [pyembroidery](https://github.com/EmbroidePy/pyembroidery), with the additional `.svg -> .pes` & `.svg -> .dst`.
+Read and write embroidery files, and turn SVG into stitches. Based on [pyembroidery](https://github.com/EmbroidePy/pyembroidery).
 
-For now, only `.pes` and `.dst` were ported from pyembroidery.
+| Format | Machines                |
+| ------ | ----------------------- |
+| `.pes` | Brother, Babylock       |
+| `.dst` | Tajima, most commercial |
+| `.jef` | Janome, Elna            |
+| `.exp` | Melco, Bernina          |
+| `.vp3` | Husqvarna Viking, Pfaff |
+| `.xxx` | Singer                  |
 
 ```sh
 npm install @guillaumemmm/tsembroidery
@@ -19,7 +26,7 @@ import {
 const preview = writeSvg(readPes(pesBytes));
 
 const { pattern, warnings } = readSvg(svgText, { size: 100 }); // fit the SVG in a 100 × 100 mm square
-const pes = writePes(pattern); // or writeDst(pattern)
+const pes = writePes(pattern);
 ```
 
 <table>
@@ -43,6 +50,14 @@ Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in t
 | `writePes(pattern: EmbPattern, settings?: PesWriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.pes` file.                                               |
 | `readDst(bytes: Uint8Array)`                                       | `EmbPattern`            | Parses a Tajima `.dst` file.                                                      |
 | `writeDst(pattern: EmbPattern, settings?: DstWriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.dst` file.                                               |
+| `readJef(bytes: Uint8Array)`                                       | `EmbPattern`            | Parses a Janome `.jef` file.                                                      |
+| `writeJef(pattern: EmbPattern, settings?: JefWriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.jef` file.                                               |
+| `readExp(bytes: Uint8Array)`                                       | `EmbPattern`            | Parses a Melco `.exp` file.                                                       |
+| `writeExp(pattern: EmbPattern, settings?: ExpWriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.exp` file.                                               |
+| `readVp3(bytes: Uint8Array)`                                       | `EmbPattern`            | Parses a Husqvarna Viking / Pfaff `.vp3` file.                                    |
+| `writeVp3(pattern: EmbPattern, settings?: Vp3WriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.vp3` file.                                               |
+| `readXxx(bytes: Uint8Array)`                                       | `EmbPattern`            | Parses a Singer `.xxx` file.                                                      |
+| `writeXxx(pattern: EmbPattern, settings?: XxxWriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.xxx` file.                                               |
 | `readSvg(input: string \| Uint8Array, settings?: SvgReadSettings)` | `{ pattern, warnings }` | Turns SVG into stitches. `warnings` lists the parts of the SVG that were skipped. |
 | `writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings)`       | `string`                | Draws a pattern as SVG, one path per run of stitches.                             |
 
@@ -70,7 +85,12 @@ globalThis.DOMParser = new Window().DOMParser;
 
 ### Writing settings
 
-`writePes` takes `version` (`6` by default, which keeps exact thread colors and metadata, or `1`). `writeDst` takes `extendedHeader` (`false` by default): DST stores no thread colors, so the machine just stops between colors, unless the extended header lists them.
+Every writer takes `encode` (`true` by default: split moves too long for the format first) and the encoder settings.
+
+- `writePes` takes `version`: `6` by default, which keeps exact thread colors and metadata, or `1`.
+- `writeDst` takes `extendedHeader` (`false` by default): DST stores no thread colors, so the machine just stops between colors, unless the extended header lists them.
+- `writeJef` takes `trims` (`false` by default: Janome machines trim on long jumps; `true` writes trim commands), `trimAt` (commands per trim, `3`) and `date` (`YYYYMMDDHHMMSS`, now by default). JEF stores Janome thread chart indexes, so colors become the nearest Janome threads.
+- EXP stores no thread colors; VP3 and XXX keep exact colors.
 
 ## License
 
