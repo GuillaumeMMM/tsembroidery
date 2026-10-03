@@ -5,7 +5,7 @@ import { pesToSvg, svgToPes } from "../dist/index.js";
 
 globalThis.DOMParser = new Window().DOMParser;
 const source = readFileSync(new URL("../docs/example.svg", import.meta.url), "utf8");
-const stitches = pesToSvg(svgToPes(source))
+const stitches = pesToSvg(svgToPes(source).bytes)
   // Slightly thinner than real thread, so the stitch rows stay visible.
   .replaceAll('stroke-width="3"', 'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"')
   // Same frame as the source: its 100-unit viewBox becomes the default 100 mm square.

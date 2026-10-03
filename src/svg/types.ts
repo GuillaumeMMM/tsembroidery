@@ -76,8 +76,6 @@ export interface SvgReadSettings {
   maxUseDepth?: number;
   /** Maximum number of expanded `<use>` references. Default 10000. */
   maxUseInstances?: number;
-  /** Called for each part of the SVG that is skipped or unsupported. */
-  onWarning?: (message: string) => void;
 }
 
 export interface NormalizedSvg {

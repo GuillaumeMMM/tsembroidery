@@ -21,12 +21,12 @@ function pecOffset(bytes: Uint8Array): number {
 }
 
 test("readSvg: accepts strings and bytes for empty documents", () => {
-  const a = readSvg('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+  const a = readSvg('<svg xmlns="http://www.w3.org/2000/svg"></svg>').pattern;
   const b = readSvg(
     new TextEncoder().encode(
       '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
     )
-  );
+  ).pattern;
 
   expect(a).toBeInstanceOf(EmbPattern);
   expect(b).toBeInstanceOf(EmbPattern);
@@ -38,7 +38,7 @@ test("readSvg: accepts strings and bytes for empty documents", () => {
 test("svgToPes: text and bytes produce a valid empty v6 design for an empty SVG", () => {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
   for (const source of [svg, new TextEncoder().encode(svg)]) {
-    const bytes = svgToPes(source);
+    const bytes = svgToPes(source).bytes;
     expect(ascii(bytes, 0, 8)).toBe("#PES0060");
     expect(ascii(bytes, pecOffset(bytes), 3)).toBe("LA:");
 
@@ -54,7 +54,7 @@ test("svgToPes: serializes parsed SVG stitches", () => {
        <path d="M0 0L10 0" stroke="#ff0000" fill="none"/>
      </svg>`,
     { stitchLength: 1000 }
-  );
+  ).bytes;
 
   expect(ascii(bytes, 0, 8)).toBe("#PES0060");
   const result = readPes(bytes);
@@ -64,7 +64,7 @@ test("svgToPes: serializes parsed SVG stitches", () => {
 });
 
 test("svgToPes: forwards the requested PES version", () => {
-  const bytes = svgToPes("<svg></svg>", { version: 1 });
+  const bytes = svgToPes("<svg></svg>", { version: 1 }).bytes;
   expect(ascii(bytes, 0, 8)).toBe("#PES0001");
   expect(readPes(bytes).stitches).toStrictEqual([[0, 0, C.END]]);
 });

@@ -5,7 +5,7 @@ export type { DstWriteSettings } from "./writeDst.js";
 export { writePes, svgToPes } from "./writePes.js";
 export type { PesWriteSettings, SvgToPesSettings } from "./writePes.js";
 export { readSvg } from "./readers/svg.js";
-export type { SvgInput, SvgReadSettings } from "./readers/svg.js";
+export type { SvgInput, SvgReadResult, SvgReadSettings } from "./readers/svg.js";
 export { writeSvg, pesToSvg } from "./writeSvg.js";
 export type { SvgWriteSettings } from "./writeSvg.js";
 

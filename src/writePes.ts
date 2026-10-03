@@ -74,8 +74,9 @@ export function writePes(
 export function svgToPes(
   input: SvgInput,
   settings?: SvgToPesSettings
-): Uint8Array {
-  return writePes(readSvg(input, settings), settings);
+): { bytes: Uint8Array; warnings: string[] } {
+  const { pattern, warnings } = readSvg(input, settings);
+  return { bytes: writePes(pattern, settings), warnings };
 }
 
 function clonePattern(source: EmbPattern): EmbPattern {

@@ -9,6 +9,7 @@ import type {
   Stitch,
   StitchBlock,
   SvgInput,
+  SvgReadResult,
   SvgReadSettings,
   SvgToPesSettings,
   SvgWriteSettings,
@@ -27,7 +28,7 @@ const pesSettings: PesWriteSettings = { version: 1, encode: true, max_jump: 2047
 const pes: Uint8Array = writePes(pattern, pesSettings);
 
 const dstSettings: DstWriteSettings = { extendedHeader: true, max_stitch: 100 };
-const dst: Uint8Array = writeDst(readSvg("<svg/>"), dstSettings);
+const dst: Uint8Array = writeDst(readSvg("<svg/>").pattern, dstSettings);
 const fromDst: EmbPattern = readDst(dst);
 
 const svgWriteSettings: SvgWriteSettings = { stable: false };
@@ -43,11 +44,15 @@ const readSettings: SvgReadSettings = {
   underlay: true,
   fit: true,
   colorTolerance: 10,
-  onWarning: (message: string) => void message,
 };
-const fromSvg: EmbPattern = readSvg(input, readSettings);
+const result: SvgReadResult = readSvg(input, readSettings);
+const fromSvg: EmbPattern = result.pattern;
+const warnings: string[] = result.warnings;
 const svgToPesSettings: SvgToPesSettings = { ...readSettings, version: 6 };
-const converted: Uint8Array = svgToPes("<svg></svg>", svgToPesSettings);
+const { bytes: converted, warnings: pesWarnings }: { bytes: Uint8Array; warnings: string[] } = svgToPes(
+  "<svg></svg>",
+  svgToPesSettings
+);
 
 const command: Command = EmbConstant.STITCH;
 const stitch: Stitch = [0, 0, command];
@@ -59,4 +64,4 @@ writePes(pattern, { maxStitch: 10 });
 // @ts-expect-error unknown settings are rejected
 readSvg("<svg/>", { spacing: 1 });
 
-void [svg, preview, converted, stitch, blocks, extents, fromDst];
+void [svg, preview, converted, warnings, pesWarnings, stitch, blocks, extents, fromDst];

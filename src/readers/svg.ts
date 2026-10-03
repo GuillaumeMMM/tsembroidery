@@ -9,6 +9,12 @@ export type SvgInput = string | Uint8Array;
 
 export type { SvgReadSettings } from "../svg/types.js";
 
+export interface SvgReadResult {
+  pattern: EmbPattern;
+  /** Parts of the SVG that were skipped or unsupported, each listed once. */
+  warnings: string[];
+}
+
 export function decodeSvgInput(input: SvgInput): string {
   let source: string;
   try {
@@ -59,7 +65,7 @@ function fitInto(pattern: EmbPattern, limit: number): void {
 export function readSvg(
   input: SvgInput,
   settings: SvgReadSettings = {}
-): EmbPattern {
+): SvgReadResult {
   const stitchOptions = resolvePathStitchOptions({
     stitchLength: settings.stitchLength,
     flattenTolerance: settings.flattenTolerance,
@@ -72,7 +78,7 @@ export function readSvg(
     throw new RangeError("SVG tieStitches must be a non-negative integer");
   }
   const normalized = normalizeSvg(decodeSvgInput(input), settings);
-  normalized.warnings.forEach((warning) => settings.onWarning?.(warning));
+  const warnings = [...new Set(normalized.warnings)];
   const fit = settings.fit ?? true;
   const pattern = new EmbPattern();
   // Each run between jumps becomes its own block, so the thread is trimmed before every jump.
@@ -84,14 +90,14 @@ export function readSvg(
     }
     return split.filter(([run]) => run.length > 0);
   });
-  if (runs.length === 0) return pattern;
+  if (runs.length === 0) return { pattern, warnings };
 
   for (const [stitches, thread] of runs) pattern.addStitchblock([tie(stitches, ties), thread]);
   // Ends like any other block, with a trim.
   const [x, y] = pattern.stitches[pattern.stitches.length - 1];
   pattern.addCommand(EmbConstant.SEQUENCE_BREAK, x, y);
   if (fit) fitInto(pattern, normalized.viewport.targetSize);
-  return pattern;
+  return { pattern, warnings };
 }
 
 export type { NormalizedSvg, SvgShape, SvgViewport } from "../svg/types.js";

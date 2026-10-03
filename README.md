@@ -13,7 +13,7 @@ import { pesToSvg, readPes, svgToPes } from "@guillaumemmm/tsembroidery";
 
 const pattern = readPes(pesBytes);
 const preview = pesToSvg(pesBytes);
-const pes = svgToPes(svgText, { size: 100 }); // fit the SVG in a 100 × 100 mm square
+const { bytes, warnings } = svgToPes(svgText, { size: 100 }); // fit the SVG in a 100 × 100 mm square
 ```
 
 <table>
@@ -39,8 +39,8 @@ Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in t
 | `writeDst(pattern: EmbPattern, settings?: DstWriteSettings)`         | `Uint8Array` | Encodes a pattern as a `.dst` file.                         |
 | `pesToSvg(bytes: Uint8Array, settings?: SvgWriteSettings)`           | `string`     | Renders a `.pes` file as SVG.                               |
 | `writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings)`         | `string`     | Renders a pattern as SVG, one path per run of stitches.     |
-| `readSvg(input: string \| Uint8Array, settings?: SvgReadSettings)`   | `EmbPattern` | Turns SVG artwork into stitches.                            |
-| `svgToPes(input: string \| Uint8Array, settings?: SvgToPesSettings)` | `Uint8Array` | `readSvg`, then `writePes`. Takes both functions' settings. |
+| `readSvg(input: string \| Uint8Array, settings?: SvgReadSettings)`   | `{ pattern, warnings }` | Turns SVG artwork into stitches. `warnings` lists the parts of the SVG that were skipped. |
+| `svgToPes(input: string \| Uint8Array, settings?: SvgToPesSettings)` | `{ bytes, warnings }`   | `readSvg`, then `writePes`. Takes both functions' settings.                     |
 
 `readSvg` and `svgToPes` need a `DOMParser`. Browsers have one; in Node, provide one first, for example from [happy-dom](https://github.com/capricorn86/happy-dom):
 
