@@ -1,11 +1,12 @@
 // Regenerates docs/example-stitches.svg from docs/example.svg (run `npm run build` first).
 import { readFileSync, writeFileSync } from "node:fs";
 import { Window } from "happy-dom";
-import { pesToSvg, svgToPes } from "../dist/index.js";
+import { readPes, readSvg, writePes, writeSvg } from "../dist/index.js";
 
 globalThis.DOMParser = new Window().DOMParser;
 const source = readFileSync(new URL("../docs/example.svg", import.meta.url), "utf8");
-const stitches = pesToSvg(svgToPes(source).bytes)
+// Through PES bytes, so the image shows exactly what the file holds.
+const stitches = writeSvg(readPes(writePes(readSvg(source).pattern)))
   // Slightly thinner than real thread, so the stitch rows stay visible.
   .replaceAll('stroke-width="3"', 'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"')
   // Same frame as the source: its 100-unit viewBox becomes the default 100 mm square.

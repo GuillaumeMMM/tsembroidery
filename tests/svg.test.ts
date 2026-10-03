@@ -4,7 +4,6 @@ import {
   EmbPattern,
   EmbThread,
   writeSvg,
-  pesToSvg,
   towards,
 } from "./internal.ts";
 

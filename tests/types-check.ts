@@ -1,5 +1,5 @@
 // Compiled by `npm run typecheck` against the published declarations in dist/.
-import { EmbConstant, EmbPattern, EmbThread, pesToSvg, readDst, readPes, readSvg, svgToPes, writeDst, writePes, writeSvg } from "../dist/index.js";
+import { EmbConstant, EmbPattern, EmbThread, readDst, readPes, readSvg, writeDst, writePes, writeSvg } from "../dist/index.js";
 import type {
   Command,
   DstWriteSettings,
@@ -11,7 +11,6 @@ import type {
   SvgInput,
   SvgReadResult,
   SvgReadSettings,
-  SvgToPesSettings,
   SvgWriteSettings,
 } from "../dist/index.js";
 
@@ -33,7 +32,7 @@ const fromDst: EmbPattern = readDst(dst);
 
 const svgWriteSettings: SvgWriteSettings = { stable: false };
 const svg: string = writeSvg(normalized, svgWriteSettings);
-const preview: string = pesToSvg(pes, { stable: true });
+const preview: string = writeSvg(readPes(pes), { stable: true });
 
 const input: SvgInput = new TextEncoder().encode("<svg></svg>");
 const readSettings: SvgReadSettings = {
@@ -48,11 +47,7 @@ const readSettings: SvgReadSettings = {
 const result: SvgReadResult = readSvg(input, readSettings);
 const fromSvg: EmbPattern = result.pattern;
 const warnings: string[] = result.warnings;
-const svgToPesSettings: SvgToPesSettings = { ...readSettings, version: 6 };
-const { bytes: converted, warnings: pesWarnings }: { bytes: Uint8Array; warnings: string[] } = svgToPes(
-  "<svg></svg>",
-  svgToPesSettings
-);
+const converted: Uint8Array = writePes(fromSvg, { version: 6 });
 
 const command: Command = EmbConstant.STITCH;
 const stitch: Stitch = [0, 0, command];
@@ -64,4 +59,4 @@ writePes(pattern, { maxStitch: 10 });
 // @ts-expect-error unknown settings are rejected
 readSvg("<svg/>", { spacing: 1 });
 
-void [svg, preview, converted, warnings, pesWarnings, stitch, blocks, extents, fromDst];
+void [svg, preview, converted, warnings, stitch, blocks, extents, fromDst];

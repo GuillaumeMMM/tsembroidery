@@ -8,8 +8,6 @@ import type { EncoderSettings } from "./encoder.js";
 import { ByteWriter } from "./binaryWriter.js";
 import { finiteExtents, truncateUtf8, writePec } from "./writePec.js";
 import type { PecColorInfo } from "./writePec.js";
-import { readSvg } from "./readers/svg.js";
-import type { SvgInput, SvgReadSettings } from "./readers/svg.js";
 
 const {
   COMMAND_MASK,
@@ -34,8 +32,6 @@ export interface PesWriteSettings extends EncoderSettings {
   /** PES format version. Version 6 keeps exact thread colors and metadata. Default 6. */
   version?: 1 | 6;
 }
-
-export type SvgToPesSettings = PesWriteSettings & SvgReadSettings;
 
 /** Serializes a pattern as a Brother .pes file. */
 export function writePes(
@@ -68,15 +64,6 @@ export function writePes(
 
   preparePatternForPes(normalized);
   return version === 6 ? writeVersion6(normalized) : writeVersion1(normalized);
-}
-
-/** Converts SVG artwork straight to a .pes file (`readSvg` then `writePes`). */
-export function svgToPes(
-  input: SvgInput,
-  settings?: SvgToPesSettings
-): { bytes: Uint8Array; warnings: string[] } {
-  const { pattern, warnings } = readSvg(input, settings);
-  return { bytes: writePes(pattern, settings), warnings };
 }
 
 function clonePattern(source: EmbPattern): EmbPattern {

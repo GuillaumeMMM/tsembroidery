@@ -2,11 +2,11 @@ export { readPes } from "./readers/pes.js";
 export { readDst } from "./readers/dst.js";
 export { writeDst } from "./writeDst.js";
 export type { DstWriteSettings } from "./writeDst.js";
-export { writePes, svgToPes } from "./writePes.js";
-export type { PesWriteSettings, SvgToPesSettings } from "./writePes.js";
+export { writePes } from "./writePes.js";
+export type { PesWriteSettings } from "./writePes.js";
 export { readSvg } from "./readers/svg.js";
 export type { SvgInput, SvgReadResult, SvgReadSettings } from "./readers/svg.js";
-export { writeSvg, pesToSvg } from "./writeSvg.js";
+export { writeSvg } from "./writeSvg.js";
 export type { SvgWriteSettings } from "./writeSvg.js";
 
 export { EmbPattern } from "./pattern.js";

@@ -9,11 +9,17 @@ npm install @guillaumemmm/tsembroidery
 ```
 
 ```ts
-import { pesToSvg, readPes, svgToPes } from "@guillaumemmm/tsembroidery";
+import {
+  readPes,
+  readSvg,
+  writePes,
+  writeSvg,
+} from "@guillaumemmm/tsembroidery";
 
-const pattern = readPes(pesBytes);
-const preview = pesToSvg(pesBytes);
-const { bytes, warnings } = svgToPes(svgText, { size: 100 }); // fit the SVG in a 100 × 100 mm square
+const preview = writeSvg(readPes(pesBytes));
+
+const { pattern, warnings } = readSvg(svgText, { size: 100 }); // fit the SVG in a 100 × 100 mm square
+const pes = writePes(pattern); // or writeDst(pattern)
 ```
 
 <table>
@@ -23,7 +29,7 @@ const { bytes, warnings } = svgToPes(svgText, { size: 100 }); // fit the SVG in 
   </tr>
   <tr>
     <td align="center">SVG input</td>
-    <td align="center"><code>svgToPes</code> output, drawn with <code>pesToSvg</code></td>
+    <td align="center"><code>readSvg</code> output, drawn with <code>writeSvg</code></td>
   </tr>
 </table>
 
@@ -31,32 +37,35 @@ const { bytes, warnings } = svgToPes(svgText, { size: 100 }); // fit the SVG in 
 
 Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in the SVG settings are in **mm**.
 
-| Function                                                             | Returns      | Description                                                 |
-| -------------------------------------------------------------------- | ------------ | ----------------------------------------------------------- |
-| `readPes(bytes: Uint8Array)`                                         | `EmbPattern` | Parses a `.pes` file.                                       |
-| `writePes(pattern: EmbPattern, settings?: PesWriteSettings)`         | `Uint8Array` | Encodes a pattern as a `.pes` file.                         |
-| `readDst(bytes: Uint8Array)`                                         | `EmbPattern` | Parses a Tajima `.dst` file.                                |
-| `writeDst(pattern: EmbPattern, settings?: DstWriteSettings)`         | `Uint8Array` | Encodes a pattern as a `.dst` file.                         |
-| `pesToSvg(bytes: Uint8Array, settings?: SvgWriteSettings)`           | `string`     | Renders a `.pes` file as SVG.                               |
-| `writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings)`         | `string`     | Renders a pattern as SVG, one path per run of stitches.     |
-| `readSvg(input: string \| Uint8Array, settings?: SvgReadSettings)`   | `{ pattern, warnings }` | Turns SVG artwork into stitches. `warnings` lists the parts of the SVG that were skipped. |
-| `svgToPes(input: string \| Uint8Array, settings?: SvgToPesSettings)` | `{ bytes, warnings }`   | `readSvg`, then `writePes`. Takes both functions' settings.                     |
+| Function                                                           | Returns                 | Description                                                                       |
+| ------------------------------------------------------------------ | ----------------------- | --------------------------------------------------------------------------------- |
+| `readPes(bytes: Uint8Array)`                                       | `EmbPattern`            | Parses a `.pes` file.                                                             |
+| `writePes(pattern: EmbPattern, settings?: PesWriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.pes` file.                                               |
+| `readDst(bytes: Uint8Array)`                                       | `EmbPattern`            | Parses a Tajima `.dst` file.                                                      |
+| `writeDst(pattern: EmbPattern, settings?: DstWriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.dst` file.                                               |
+| `readSvg(input: string \| Uint8Array, settings?: SvgReadSettings)` | `{ pattern, warnings }` | Turns SVG into stitches. `warnings` lists the parts of the SVG that were skipped. |
+| `writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings)`       | `string`                | Draws a pattern as SVG, one path per run of stitches.                             |
 
-`readSvg` and `svgToPes` need a `DOMParser`. Browsers have one; in Node, provide one first, for example from [happy-dom](https://github.com/capricorn86/happy-dom):
+`readSvg` needs a `DOMParser`. Browsers have one; in Node, provide one first, for example from [happy-dom](https://github.com/capricorn86/happy-dom):
 
-### `readSvg` settings
+```ts
+import { Window } from "happy-dom";
+globalThis.DOMParser = new Window().DOMParser;
+```
 
-| Setting            | Default | Description                                                                                                  |
-| ------------------ | ------- | ------------------------------------------------------------------------------------------------------------ |
-| `size`             | `100`   | Edge in mm of the square the SVG's viewBox is fitted into.                                                   |
-| `stitchLength`     | `2.5`   | Longest running stitch, in mm.                                                                               |
-| `rowSpacing`       | `0.4`   | Gap between parallel stitches in fills and satin, in mm.                                                     |
-| `pullCompensation` | `0.2`   | Fills and satin are widened by this much on each side, in mm, so seams stay closed when the fabric pulls in. |
+### `readSvg` `SvgReadSettings` settings
+
+| Setting            | Default | Description                                                                                                                                                                   |
+| ------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `size`             | `100`   | Edge in mm of the square the SVG's viewBox is fitted into.                                                                                                                    |
+| `stitchLength`     | `2.5`   | Longest running stitch, in mm.                                                                                                                                                |
+| `rowSpacing`       | `0.4`   | Gap between parallel stitches in fills and satin, in mm.                                                                                                                      |
+| `pullCompensation` | `0.2`   | Fills and satin are widened by this much on each side, in mm, so seams stay closed when the fabric pulls in.                                                                  |
 | `fit`              | `true`  | Shrink and move the stitches if needed so the design stays inside the `size` square (pull compensation, strokes on the edge and content outside the viewBox can overflow it). |
-| `underlay`         | `true`  | Stitch a holding layer under fills and satin first.                                                          |
-| `tieStitches`      | `0`     | Small back-and-forth stitches added wherever the thread is cut (start, end, both sides of jumps and color changes) so it holds. `2` or more locks the start too. |
-| `colorTolerance`   | `10`    | Colors closer than this (0–765) share one thread. `0` keeps every distinct color.                            |
-| `flattenTolerance` | `0.05`  | Maximum error when curves are turned into lines, in mm.                                                      |
+| `underlay`         | `true`  | Stitch a holding layer under fills and satin first.                                                                                                                           |
+| `tieStitches`      | `0`     | Small back-and-forth stitches added wherever the thread is cut (start, end, both sides of jumps and color changes) so it holds. `2` or more locks the start too.              |
+| `colorTolerance`   | `10`    | Colors closer than this (0–765) share one thread. `0` keeps every distinct color.                                                                                             |
+| `flattenTolerance` | `0.05`  | Maximum error when curves are turned into lines, in mm.                                                                                                                       |
 
 ### Writing settings
 
