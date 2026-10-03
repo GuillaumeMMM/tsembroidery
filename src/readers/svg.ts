@@ -7,7 +7,7 @@ import type { SvgReadSettings } from "../svg/types.js";
 
 export type SvgInput = string | Uint8Array;
 
-export type { SvgReadSettings } from "../svg/types.js";
+export type { SvgDomParser, SvgReadSettings } from "../svg/types.js";
 
 export interface SvgReadResult {
   pattern: EmbPattern;

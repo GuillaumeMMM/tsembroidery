@@ -51,7 +51,12 @@ export interface SvgViewport {
   transform: Matrix;
 }
 
+/** A `DOMParser` class: the browser's, or one from a DOM library such as happy-dom. */
+export type SvgDomParser = new () => { parseFromString(source: string, type: "image/svg+xml"): unknown };
+
 export interface SvgReadSettings {
+  /** Parses the SVG. Default: the global `DOMParser`, which browsers have and Node doesn't. */
+  DOMParser?: SvgDomParser;
   /** Edge of the square the SVG is fitted into, in mm. Default 100 (a 10×10 cm hoop). */
   size?: number;
   /** How the viewBox fits the square, as in SVG. Default "xMidYMid meet". */

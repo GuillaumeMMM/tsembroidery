@@ -1,4 +1,5 @@
 // Compiled by `npm run typecheck` against the published declarations in dist/.
+import { Window } from "happy-dom";
 import {
   EmbConstant,
   EmbPattern,
@@ -30,6 +31,7 @@ import type {
   PesWriteSettings,
   Stitch,
   StitchBlock,
+  SvgDomParser,
   SvgInput,
   SvgReadResult,
   SvgReadSettings,
@@ -78,6 +80,9 @@ const readSettings: SvgReadSettings = {
   colorTolerance: 10,
 };
 const result: SvgReadResult = readSvg(input, readSettings);
+// The browser's DOMParser and happy-dom's both fit.
+const parsers: SvgDomParser[] = [DOMParser, new Window().DOMParser];
+readSvg("<svg/>", { DOMParser: new Window().DOMParser });
 const fromSvg: EmbPattern = result.pattern;
 const warnings: string[] = result.warnings;
 const converted: Uint8Array = writePes(fromSvg, { version: 6 });
@@ -92,4 +97,4 @@ writePes(pattern, { maxStitch: 10 });
 // @ts-expect-error unknown settings are rejected
 readSvg("<svg/>", { spacing: 1 });
 
-void [svg, preview, converted, warnings, others, stitch, blocks, extents, fromDst];
+void [svg, preview, converted, warnings, others, parsers, stitch, blocks, extents, fromDst];

@@ -17,7 +17,7 @@ export type { XxxWriteSettings } from "./writeXxx.js";
 export { writePes } from "./writePes.js";
 export type { PesWriteSettings } from "./writePes.js";
 export { readSvg } from "./readers/svg.js";
-export type { SvgInput, SvgReadResult, SvgReadSettings } from "./readers/svg.js";
+export type { SvgDomParser, SvgInput, SvgReadResult, SvgReadSettings } from "./readers/svg.js";
 export { writeSvg } from "./writeSvg.js";
 export type { SvgWriteSettings } from "./writeSvg.js";
 

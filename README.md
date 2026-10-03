@@ -61,11 +61,12 @@ Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in t
 | `readSvg(input: string \| Uint8Array, settings?: SvgReadSettings)` | `{ pattern, warnings }` | Turns SVG into stitches. `warnings` lists the parts of the SVG that were skipped. |
 | `writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings)`       | `string`                | Draws a pattern as SVG, one path per run of stitches.                             |
 
-`readSvg` needs a `DOMParser`. Browsers have one; in Node, provide one first, for example from [happy-dom](https://github.com/capricorn86/happy-dom):
+`readSvg` needs a `DOMParser`. Browsers have one; in Node, pass one in the settings.
 
 ```ts
 import { Window } from "happy-dom";
-globalThis.DOMParser = new Window().DOMParser;
+
+const { pattern } = readSvg(svgText, { DOMParser: new Window().DOMParser });
 ```
 
 ### `readSvg` `SvgReadSettings` settings
