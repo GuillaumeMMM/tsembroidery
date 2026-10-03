@@ -40,7 +40,7 @@ const readSettings: SvgReadSettings = {
   runningStitchLength: 2.5,
   fillStitchLength: 3,
   rowSpacing: 0.4,
-  pullCompensation: 0.2,
+  pullCompensation: 0,
   underlay: true,
   fit: true,
   colorTolerance: 10,

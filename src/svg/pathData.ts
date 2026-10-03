@@ -39,8 +39,12 @@ function flattenCubic(
   end: Point2,
   tolerance: number
 ): void {
-  const length = distance(start, c1) + distance(c1, c2) + distance(c2, end);
-  const steps = Math.max(2, Math.min(512, Math.ceil(length / Math.max(tolerance, 0.001))));
+  // Wang's formula: enough segments to stay within `tolerance` of the curve.
+  const bend = Math.max(
+    Math.hypot(start.x - 2 * c1.x + c2.x, start.y - 2 * c1.y + c2.y),
+    Math.hypot(c1.x - 2 * c2.x + end.x, c1.y - 2 * c2.y + end.y)
+  );
+  const steps = Math.max(1, Math.min(512, Math.ceil(Math.sqrt((0.75 * bend) / Math.max(tolerance, 0.001)))));
   for (let index = 1; index < steps; index += 1) {
     const t = index / steps;
     const u = 1 - t;
@@ -130,21 +134,51 @@ export function resample(points: Point2[], closed: boolean, stitchLength: number
   return output;
 }
 
+function unit(x: number, y: number): Point2 {
+  const length = Math.hypot(x, y);
+  return length > 0 ? { x: x / length, y: y / length } : { x: 0, y: 0 };
+}
+
+/**
+ * Zigzag across the line, evenly spaced along it. The direction across is blended
+ * between corners, so curves made of straight segments stay smooth.
+ */
 function satin(points: Point2[], closed: boolean, width: number, spacing: number): Point2[] {
-  // Same-side peaks are `spacing` apart.
-  const samples = resample(points, closed, spacing / 2);
-  const last = samples.length - 1;
-  let normal = { x: 0, y: 0 };
-  return samples.map((point, index) => {
-    const previous = samples[index - 1] ?? (closed ? samples[last - 1] : point);
-    const next = samples[index + 1] ?? (closed ? samples[1] : point);
-    const length = distance(previous, next);
-    if (length > 0) {
-      normal = { x: (previous.y - next.y) / length, y: (next.x - previous.x) / length };
-    }
-    const offset = index % 2 === 0 ? width / 2 : -width / 2;
-    return { x: point.x + normal.x * offset, y: point.y + normal.y * offset };
+  const line = points.filter((point, i) => i === 0 || distance(points[i - 1], point) > 0.000001);
+  if (closed && line.length > 1 && distance(line[0], line[line.length - 1]) > 0.000001) line.push(line[0]);
+  if (line.length < 2) return [...line];
+  const segments = line.slice(1).map((end, i) => unit(end.x - line[i].x, end.y - line[i].y));
+  const tangents = line.map((_, i) => {
+    let before = segments[i - 1];
+    let after = segments[i];
+    if (closed && (i === 0 || i === line.length - 1)) [before, after] = [segments[segments.length - 1], segments[0]];
+    if (!before || !after) return before ?? after;
+    const blended = unit(before.x + after.x, before.y + after.y);
+    return blended.x === 0 && blended.y === 0 ? after : blended;
   });
+  const lengths = [0];
+  for (let i = 1; i < line.length; i++) lengths.push(lengths[i - 1] + distance(line[i - 1], line[i]));
+  const total = lengths[lengths.length - 1];
+  // Same-side peaks are `spacing` apart; a loop needs an even count to close on the same side.
+  let count = Math.max(1, Math.ceil(total / (spacing / 2)));
+  if (closed && count % 2 === 1) count += 1;
+
+  const output: Point2[] = [];
+  let segment = 0;
+  for (let k = 0; k <= count; k++) {
+    const along = (total * k) / count;
+    while (segment < line.length - 2 && lengths[segment + 1] < along) segment++;
+    const t = Math.min(1, Math.max(0, (along - lengths[segment]) / (lengths[segment + 1] - lengths[segment])));
+    const [a, b] = [line[segment], line[segment + 1]];
+    const [ta, tb] = [tangents[segment], tangents[segment + 1]];
+    const tangent = unit(ta.x + (tb.x - ta.x) * t, ta.y + (tb.y - ta.y) * t);
+    const offset = k % 2 === 0 ? width / 2 : -width / 2;
+    output.push({
+      x: a.x + (b.x - a.x) * t - tangent.y * offset,
+      y: a.y + (b.y - a.y) * t + tangent.x * offset,
+    });
+  }
+  return output;
 }
 
 export function resolvePathStitchOptions(
@@ -155,7 +189,7 @@ export function resolvePathStitchOptions(
     fillStitchLength = 3,
     flattenTolerance = 0.05,
     underlay = true,
-    pullCompensation = 0.2,
+    pullCompensation = 0,
     rowSpacing = 0.4,
   } = options;
   if (!Number.isFinite(runningStitchLength) || runningStitchLength <= 0) {

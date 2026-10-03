@@ -87,6 +87,22 @@ test("readSvg: flattens arcs without producing invalid coordinates", () => {
   expect(end.y).toBeCloseTo(0, 9);
 });
 
+test("readSvg: flattens curves within the tolerance, with as few segments as needed", () => {
+  const circle = "M-400 0A400 400 0 1 1 400 0A400 400 0 1 1 -400 0";
+  const [{ points }] = flattenSvgPath(circle, 0.5);
+  // Chords sag inside the circle; the cubic approximation of arcs adds about 0.1.
+  for (let i = 1; i < points.length; i++) {
+    const [a, b] = [points[i - 1], points[i]];
+    expect(Math.hypot((a.x + b.x) / 2, (a.y + b.y) / 2)).toBeGreaterThan(400 - 0.5 - 0.2);
+  }
+  // About 4 mm segments on an 80 mm circle, not one every tolerance.
+  expect(points.length).toBeLessThan(100);
+  const stitches = readSvg(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#000" stroke-width="0.5"/></svg>`
+  ).pattern.countStitchCommands(C.STITCH);
+  expect(stitches).toBeLessThan(200);
+});
+
 test("readSvg: treats uppercase path commands as absolute", () => {
   expect(flattenSvgPath("M10 10L20 10V30H5")).toStrictEqual([
     {
@@ -591,12 +607,12 @@ test("readSvg: tatami-fills a shape, covering it with short stitches", () => {
   const { block, thread } = fill(`<rect x="10" y="10" width="20" height="20" fill="#e53935"/>`);
   expect(thread.hexColor()).toBe("#e53935");
   expect(block.every(([, , command]) => command === C.STITCH)).toBe(true);
-  // Pull compensation grows the fill by 0.2 mm on each side.
+  // No pull compensation by default: the fill stays inside the shape.
   for (const [x, y] of block) {
-    expect(x).toBeGreaterThanOrEqual(98 - 1e-6);
-    expect(x).toBeLessThanOrEqual(302 + 1e-6);
-    expect(y).toBeGreaterThanOrEqual(98 - 1e-6);
-    expect(y).toBeLessThanOrEqual(302 + 1e-6);
+    expect(x).toBeGreaterThanOrEqual(100 - 1e-6);
+    expect(x).toBeLessThanOrEqual(300 + 1e-6);
+    expect(y).toBeGreaterThanOrEqual(100 - 1e-6);
+    expect(y).toBeLessThanOrEqual(300 + 1e-6);
   }
   const segments = segmentsOf(block);
   // 3 mm max stitch, plus up to the 0.5 mm minimum before the first grid point.
@@ -690,8 +706,8 @@ test("readSvg: fits pull compensation, edge strokes and overflowing content into
     <path d="M-20 50H50" stroke="#000000" stroke-width="4" fill="none"/>`);
   const inside = ({ minX, minY, maxX, maxY }: ReturnType<EmbPattern["extents"]>) =>
     minX >= 0 && minY >= 0 && maxX <= 1000 && maxY <= 1000;
-  expect(inside(readSvg(source, { fit: false }).pattern.extents())).toBe(false);
-  const fitted = readSvg(source).pattern.extents();
+  expect(inside(readSvg(source, { fit: false, pullCompensation: 0.2 }).pattern.extents())).toBe(false);
+  const fitted = readSvg(source, { pullCompensation: 0.2 }).pattern.extents();
   expect(inside(fitted)).toBe(true);
   expect(fitted.maxX - fitted.minX).toBeCloseTo(1000, 6);
 });
@@ -759,6 +775,19 @@ test("readSvg: groups colors and moves on to the nearest remaining color", () =>
 const fillBlock = (settings: object) =>
   blocks(readSvg(svg100(`<rect x="10" y="10" width="20" height="20" fill="#e53935"/>`), settings).pattern)[0][0];
 const xExtent = (block: number[][]) => [Math.min(...block.map(([x]) => x)), Math.max(...block.map(([x]) => x))];
+
+test("readSvg: satin on a curve keeps an even width and spacing", () => {
+  // A 3 mm satin ring of radius 30 mm, centred on (500, 500).
+  const [[block]] = blocks(
+    readSvg(svg100(`<circle cx="50" cy="50" r="30" fill="none" stroke="#000" stroke-width="3"/>`), { underlay: false }).pattern
+  );
+  const radii = block.map(([x, y]) => Math.hypot(x - 500, y - 500));
+  for (const radius of radii) expect(Math.min(Math.abs(radius - 285), Math.abs(radius - 315))).toBeLessThan(0.5);
+  // Same-side peaks every 0.4 mm along the centre line.
+  const outer = block.filter((_, i) => i % 2 === 0);
+  const gaps = outer.slice(1).map(([x, y], i) => Math.hypot(x - outer[i][0], y - outer[i][1]) * (300 / 315));
+  expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.2);
+});
 
 test("readSvg: grows fills and satin by the pull compensation", () => {
   expect(xExtent(fillBlock({ pullCompensation: 0, underlay: false }))).toEqual([100, 300].map((v) => expect.closeTo(v, 5)));
@@ -831,8 +860,8 @@ test("readSvg: clips fills to a clipPath", () => {
     <defs><clipPath id="c"><circle cx="50" cy="50" r="20"/></clipPath></defs>
     <rect width="100" height="100" fill="#e53935" clip-path="url(#c)"/>`)).pattern);
   expect(points.length).toBeGreaterThan(100);
-  // Radius 20 mm, plus 0.2 mm pull compensation and flattening slack.
-  expect(Math.max(...points.map(([x, y]) => Math.hypot(x - 500, y - 500)))).toBeLessThanOrEqual(203);
+  // Radius 20 mm, plus flattening slack.
+  expect(Math.max(...points.map(([x, y]) => Math.hypot(x - 500, y - 500)))).toBeLessThanOrEqual(201);
 });
 
 test("readSvg: clips a group in its own coordinates", () => {

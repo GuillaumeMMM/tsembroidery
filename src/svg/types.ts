@@ -64,7 +64,7 @@ export interface SvgReadSettings {
   flattenTolerance?: number;
   /** First layer under fills (sparse rows across) and satin (center walk). Default true. */
   underlay?: boolean;
-  /** Widens fills and satin so fabric pulling in doesn't open gaps, in mm. Default 0.2. */
+  /** Widens fills and satin so fabric pulling in doesn't open gaps, in mm. Default 0. */
   pullCompensation?: number;
   /** Distance between parallel stitches in fills and satin, in mm. Default 0.4. */
   rowSpacing?: number;
