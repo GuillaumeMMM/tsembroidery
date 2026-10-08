@@ -18,9 +18,10 @@ export interface SvgReadResult {
 export function decodeSvgInput(input: SvgInput): string {
   let source: string;
   try {
-    source = typeof input === "string"
-      ? input
-      : new TextDecoder("utf-8", { fatal: true }).decode(input);
+    source =
+      typeof input === "string"
+        ? input
+        : new TextDecoder("utf-8", { fatal: true }).decode(input);
   } catch {
     throw new Error("readSvg: input bytes are not valid UTF-8");
   }
@@ -35,7 +36,9 @@ function tie(stitches: Stitch[], count: number): Stitch[] {
   if (count === 0 || stitches.length < 2) return stitches;
   const lock = ([x, y]: Stitch, [nx, ny]: Stitch): Stitch[] =>
     Array.from({ length: count }, (_, i) =>
-      i % 2 === 0 ? [x + (nx - x) / 3, y + (ny - y) / 3, EmbConstant.STITCH] : [x, y, EmbConstant.STITCH]
+      i % 2 === 0
+        ? [x + (nx - x) / 3, y + (ny - y) / 3, EmbConstant.STITCH]
+        : [x, y, EmbConstant.STITCH],
     );
   const last = stitches.length - 1;
   return [
@@ -52,7 +55,10 @@ function fitInto(pattern: EmbPattern, limit: number): void {
   const scale = Math.min(1, limit / Math.max(maxX - minX, maxY - minY));
   const fit = (min: number, max: number) => {
     const half = ((max - min) * scale) / 2;
-    return [(min + max) / 2, Math.min(Math.max((min + max) / 2, half), limit - half)];
+    return [
+      (min + max) / 2,
+      Math.min(Math.max((min + max) / 2, half), limit - half),
+    ];
   };
   const [[cx, nx], [cy, ny]] = [fit(minX, maxX), fit(minY, maxY)];
   for (const stitch of pattern.stitches) {
@@ -61,10 +67,12 @@ function fitInto(pattern: EmbPattern, limit: number): void {
   }
 }
 
-/** Fills become tatami and strokes running or satin stitches; hidden parts are dropped and colors grouped. */
+/**
+ * Fills become tatami and strokes running or satin stitches; hidden parts are dropped and colors grouped.
+ */
 export function readSvg(
   input: SvgInput,
-  settings: SvgReadSettings = {}
+  settings: SvgReadSettings = {},
 ): SvgReadResult {
   const stitchOptions = resolvePathStitchOptions({
     runningStitchLength: settings.runningStitchLength,
@@ -83,21 +91,29 @@ export function readSvg(
   const fit = settings.fit ?? true;
   const pattern = new EmbPattern();
   // Each run between jumps becomes its own block, so the thread is trimmed before every jump.
-  const runs = planStitches(normalized.shapes, stitchOptions).flatMap(([stitches, thread]) => {
-    const split: StitchBlock[] = [];
-    for (const stitch of stitches) {
-      if (stitch[2] === EmbConstant.JUMP || split.length === 0) split.push([[], thread]);
-      if (stitch[2] === EmbConstant.STITCH) split[split.length - 1][0].push(stitch);
-    }
-    return split.filter(([run]) => run.length > 0);
-  });
+  const runs = planStitches(normalized.shapes, stitchOptions).flatMap(
+    ([stitches, thread]) => {
+      const split: StitchBlock[] = [];
+      for (const stitch of stitches) {
+        if (stitch[2] === EmbConstant.JUMP || split.length === 0)
+          split.push([[], thread]);
+        if (stitch[2] === EmbConstant.STITCH)
+          split[split.length - 1][0].push(stitch);
+      }
+      return split.filter(([run]) => run.length > 0);
+    },
+  );
   if (runs.length === 0) return { pattern, warnings };
 
-  for (const [stitches, thread] of runs) pattern.addStitchblock([tie(stitches, ties), thread]);
+  for (const [stitches, thread] of runs)
+    pattern.addStitchblock([tie(stitches, ties), thread]);
   // Ends like any other block, with a trim.
   const [x, y] = pattern.stitches[pattern.stitches.length - 1];
   pattern.addCommand(EmbConstant.SEQUENCE_BREAK, x, y);
-  if (fit) fitInto(pattern, normalized.viewport.targetSize);
+  const size = normalized.viewport.targetSize;
+  if (fit) fitInto(pattern, size);
+  // Embroidery formats start the needle at (0, 0), the center of the design.
+  pattern.translate(-size / 2, -size / 2);
   return { pattern, warnings };
 }
 

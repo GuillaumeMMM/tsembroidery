@@ -1,8 +1,24 @@
 /** @vitest-environment happy-dom */
 import { test, expect } from "vitest";
-import { EmbConstant as C, EmbPattern, readPes, readSvg, writePes, type SvgReadSettings } from "./internal.ts";
+import {
+  EmbConstant as C,
+  EmbPattern,
+  readPes,
+  readSvg as readSvgCentered,
+  writePes,
+  type SvgInput,
+  type SvgReadSettings,
+} from "./internal.ts";
 import { normalizeSvg } from "../src/svg/normalize.ts";
 import { flattenSvgPath } from "../src/svg/pathData.ts";
+
+/** readSvg with stitches moved back into the `size` square at the origin, the SVG's own coordinates. */
+function readSvg(input: SvgInput, settings: SvgReadSettings = {}) {
+  const result = readSvgCentered(input, settings);
+  const half = ((settings.size ?? 100) * 10) / 2;
+  result.pattern.translate(half, half);
+  return result;
+}
 
 function blocks(pattern: EmbPattern) {
   return [...pattern.getAsStitchblock()];
@@ -29,6 +45,18 @@ test("readSvg: defaults to a 100 mm square with 2.5 mm stitches", () => {
   expect(block[0]).toStrictEqual([0, 500, C.STITCH]);
   expect(block[block.length - 1]).toStrictEqual([1000, 500, C.STITCH]);
   expect(block).toHaveLength(41);
+});
+
+test("readSvg: centers the size square on the origin, where the needle starts", () => {
+  const { pattern } = readSvgCentered(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+       <path d="M0 5L10 5" stroke="black" stroke-width="0.01"/>
+     </svg>`,
+    { size: 50 }
+  );
+  const [[block]] = blocks(pattern);
+  expect(block[0]).toStrictEqual([-250, 0, C.STITCH]);
+  expect(block[block.length - 1]).toStrictEqual([250, 0, C.STITCH]);
 });
 
 test("readSvg: fits the viewBox into the size square with meet", () => {
