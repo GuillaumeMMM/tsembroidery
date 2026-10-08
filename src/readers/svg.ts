@@ -49,9 +49,20 @@ function tie(stitches: Stitch[], count: number): Stitch[] {
   ];
 }
 
+/** Box around the stitches; extents() would also count the first color break, left at (0, 0). */
+function stitchExtents(pattern: EmbPattern) {
+  let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [x, y, command] of pattern.stitches) {
+    if (command !== EmbConstant.STITCH) continue;
+    [minX, minY] = [Math.min(minX, x), Math.min(minY, y)];
+    [maxX, maxY] = [Math.max(maxX, x), Math.max(maxY, y)];
+  }
+  return { minX, minY, maxX, maxY };
+}
+
 /** Shrinks and moves the stitches, if needed, so they stay inside the `limit`×`limit` square at the origin. */
 function fitInto(pattern: EmbPattern, limit: number): void {
-  const { minX, minY, maxX, maxY } = pattern.extents();
+  const { minX, minY, maxX, maxY } = stitchExtents(pattern);
   const scale = Math.min(1, limit / Math.max(maxX - minX, maxY - minY));
   const fit = (min: number, max: number) => {
     const half = ((max - min) * scale) / 2;
@@ -67,10 +78,8 @@ function fitInto(pattern: EmbPattern, limit: number): void {
   }
 }
 
-/**
- * Fills become tatami and strokes running or satin stitches; hidden parts are dropped and colors grouped.
- */
-export function readSvg(
+/** Stitches the SVG in the coordinates of the `size` square at the origin. */
+export function stitchSvg(
   input: SvgInput,
   settings: SvgReadSettings = {},
 ): SvgReadResult {
@@ -110,11 +119,25 @@ export function readSvg(
   // Ends like any other block, with a trim.
   const [x, y] = pattern.stitches[pattern.stitches.length - 1];
   pattern.addCommand(EmbConstant.SEQUENCE_BREAK, x, y);
-  const size = normalized.viewport.targetSize;
-  if (fit) fitInto(pattern, size);
-  // Embroidery formats start the needle at (0, 0), the center of the design.
-  pattern.translate(-size / 2, -size / 2);
+  if (fit) fitInto(pattern, normalized.viewport.targetSize);
   return { pattern, warnings };
+}
+
+/**
+ * Fills become tatami and strokes running or satin stitches; hidden parts are dropped and colors grouped.
+ * The stitches are centered on (0, 0), where the needle starts.
+ */
+export function readSvg(
+  input: SvgInput,
+  settings: SvgReadSettings = {},
+): SvgReadResult {
+  const result = stitchSvg(input, settings);
+  const { pattern } = result;
+  if (pattern.stitches.length > 0) {
+    const { minX, minY, maxX, maxY } = stitchExtents(pattern);
+    pattern.translate(-(minX + maxX) / 2, -(minY + maxY) / 2);
+  }
+  return result;
 }
 
 export type { NormalizedSvg, SvgShape, SvgViewport } from "../svg/types.js";

@@ -8,3 +8,4 @@ export { EmbThreadPec, getThreadSet } from "../src/pecThreads.ts";
 export { Transcoder } from "../src/encoder.ts";
 export { readPec } from "../src/readers/pec.ts";
 export { readPesInto } from "../src/readers/pes.ts";
+export { stitchSvg } from "../src/readers/svg.ts";

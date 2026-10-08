@@ -5,20 +5,12 @@ import {
   EmbPattern,
   readPes,
   readSvg as readSvgCentered,
+  stitchSvg as readSvg,
   writePes,
-  type SvgInput,
   type SvgReadSettings,
 } from "./internal.ts";
 import { normalizeSvg } from "../src/svg/normalize.ts";
 import { flattenSvgPath } from "../src/svg/pathData.ts";
-
-/** readSvg with stitches moved back into the `size` square at the origin, the SVG's own coordinates. */
-function readSvg(input: SvgInput, settings: SvgReadSettings = {}) {
-  const result = readSvgCentered(input, settings);
-  const half = ((settings.size ?? 100) * 10) / 2;
-  result.pattern.translate(half, half);
-  return result;
-}
 
 function blocks(pattern: EmbPattern) {
   return [...pattern.getAsStitchblock()];
@@ -47,16 +39,19 @@ test("readSvg: defaults to a 100 mm square with 2.5 mm stitches", () => {
   expect(block).toHaveLength(41);
 });
 
-test("readSvg: centers the size square on the origin, where the needle starts", () => {
+test("readSvg: centers the stitches on the origin, where the needle starts", () => {
+  // The line sits off-center in its viewBox; the stitches are centered anyway.
   const { pattern } = readSvgCentered(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
-       <path d="M0 5L10 5" stroke="black" stroke-width="0.01"/>
+       <path d="M2 3L6 3" stroke="black" stroke-width="0.01"/>
      </svg>`,
     { size: 50 }
   );
   const [[block]] = blocks(pattern);
-  expect(block[0]).toStrictEqual([-250, 0, C.STITCH]);
-  expect(block[block.length - 1]).toStrictEqual([250, 0, C.STITCH]);
+  expect(block[0]).toStrictEqual([-100, 0, C.STITCH]);
+  expect(block[block.length - 1]).toStrictEqual([100, 0, C.STITCH]);
+  const empty = readSvgCentered(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>`);
+  expect(empty.pattern.stitches).toHaveLength(0);
 });
 
 test("readSvg: fits the viewBox into the size square with meet", () => {
@@ -740,11 +735,19 @@ test("readSvg: fits pull compensation, edge strokes and overflowing content into
   expect(fitted.maxX - fitted.minX).toBeCloseTo(1000, 6);
 });
 
-test("readSvg: fitting moves a design that fits but sits outside the square, without scaling it", () => {
-  const source = svg100(`<rect x="-30" y="10" width="20" height="20" fill="#ff0000"/>`);
-  const loose = readSvg(source, { fit: false, pullCompensation: 0 }).pattern.extents();
-  const fitted = readSvg(source, { pullCompensation: 0 }).pattern.extents();
-  expect(fitted.minX).toBeCloseTo(0, 6);
+test.each([
+  ["left", -30, 0],
+  ["right", 110, 1000],
+])("readSvg: fitting moves a design that fits but sits outside the square on the %s, without scaling it", (_, x, edge) => {
+  const source = svg100(`<rect x="${x}" y="10" width="20" height="20" fill="#ff0000"/>`);
+  const stitchBox = (pattern: EmbPattern) => {
+    const stitches = new EmbPattern();
+    stitches.stitches = pattern.stitches.filter(([, , command]) => command === C.STITCH);
+    return stitches.extents();
+  };
+  const loose = stitchBox(readSvg(source, { fit: false, pullCompensation: 0 }).pattern);
+  const fitted = stitchBox(readSvg(source, { pullCompensation: 0 }).pattern);
+  expect(x < 0 ? fitted.minX : fitted.maxX).toBeCloseTo(edge, 6);
   expect(fitted.maxX - fitted.minX).toBeCloseTo(loose.maxX - loose.minX, 6);
   expect([fitted.minY, fitted.maxY]).toStrictEqual([loose.minY, loose.maxY]);
 });

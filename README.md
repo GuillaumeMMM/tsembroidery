@@ -73,7 +73,7 @@ const { pattern } = readSvg(svgText, { DOMParser: new Window().DOMParser });
 
 | Setting               | Default | Description                                                                                                                                                                                          |
 | --------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `size`                | `100`   | Edge in mm of the square the SVG's viewBox is fitted into. The square is centered on (0, 0), where the needle starts.                                                                                |
+| `size`                | `100`   | Edge in mm of the square the SVG's viewBox is fitted into. The stitches are then centered on (0, 0), where the needle starts.                                                                        |
 | `runningStitchLength` | `2.5`   | Longest stitch along lines, in mm: thin strokes, the satin underlay and travel inside fills. Straight parts are split into equal stitches; corners and curves are kept, so the shape doesn't change. |
 | `fillStitchLength`    | `3`     | Longest stitch in fill rows, in mm. Shorter is sturdier, longer is softer and faster to sew.                                                                                                         |
 | `rowSpacing`          | `0.4`   | Gap between parallel stitches in fills and satin, in mm.                                                                                                                                             |
