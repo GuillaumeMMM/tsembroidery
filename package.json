@@ -1,6 +1,6 @@
 {
   "name": "@guillaumemmm/tsembroidery",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "description": "Read and write PES, DST, JEF, EXP, VP3 and XXX embroidery files, render them as SVG, and turn flat SVG artwork into stitches.",
   "keywords": [
     "embroidery",
