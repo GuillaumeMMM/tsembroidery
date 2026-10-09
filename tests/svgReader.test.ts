@@ -883,6 +883,60 @@ test("readSvg: spaces fill rows and satin stitches by rowSpacing", () => {
   expect(() => readSvg(svg100(""), { rowSpacing: 0 }).pattern).toThrow(/row spacing/);
 });
 
+/** Directions (degrees in [0, 180)) of the stitches longer than `min`, which are the rows rather than travel or row ends. */
+const rowDirections = (block: number[][], min = 20) =>
+  segmentsOf(block as [number, number, number][])
+    .filter(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1]) > min)
+    .map(([a, b]) => ((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI + 180) % 180);
+const angleGap = (a: number, b: number) => Math.min(Math.abs(a - b) % 180, 180 - (Math.abs(a - b) % 180));
+
+test("readSvg: rows follow fillAngle", () => {
+  const settings = { pullCompensation: 0, underlay: false };
+  for (const [fillAngle, expected] of [[0, 0], [90, 90], [30, 30], [-30, 150]]) {
+    const directions = rowDirections(fillBlock({ ...settings, fillAngle }));
+    expect(directions.length).toBeGreaterThan(20);
+    for (const direction of directions) expect(angleGap(direction, expected)).toBeLessThan(1e-6);
+  }
+  // At 0° every row is horizontal: one y per row, 0.4 mm apart.
+  const ys = [...new Set(fillBlock({ ...settings, fillAngle: 0 }).map(([, y]) => y.toFixed(6)))].map(Number).sort((a, b) => a - b);
+  expect(ys.slice(1).map((y, i) => y - ys[i])).toEqual(ys.slice(1).map(() => expect.closeTo(4, 6)));
+});
+
+test("readSvg: fill angles are undirected and default to today's 45°", () => {
+  const stitches = (settings: object) => readSvg(svg100(`<circle cx="50" cy="50" r="30" fill="#00f"/>`), settings).pattern.stitches;
+  expect(stitches({ fillAngle: 45 })).toStrictEqual(stitches({}));
+  expect(stitches({ fillAngle: 225 })).toStrictEqual(stitches({}));
+  expect(stitches({ fillAngle: -135 })).toStrictEqual(stitches({}));
+  expect(stitches({ fillAngle: 180 })).toStrictEqual(stitches({ fillAngle: 0 }));
+  expect(stitches({ fillAngle: 0 })).not.toStrictEqual(stitches({}));
+  for (const fillAngle of [NaN, Infinity]) expect(() => stitches({ fillAngle })).toThrow(/fill angle/);
+});
+
+test("readSvg: underlay rows run across the fill", () => {
+  const underlayOf = (settings: object) => {
+    const block = fillBlock({ pullCompensation: 0, ...settings });
+    const fillLength = fillBlock({ pullCompensation: 0, underlay: false, ...settings }).length;
+    return block.slice(0, block.length - fillLength);
+  };
+  // Underlay rows are split into 3 mm stitches, so count every stitch but the short row ends.
+  const share = (block: number[][], angle: number) => {
+    const directions = rowDirections(block, 2);
+    expect(directions.length).toBeGreaterThan(10);
+    return directions.filter((direction) => angleGap(direction, angle) < 1e-6).length / directions.length;
+  };
+  for (const [settings, fill, expected] of [
+    [{ fillAngle: 0 }, 0, 90],
+    [{ fillAngle: 90 }, 90, 0],
+    [{ fillAngle: 30 }, 30, 120],
+    [{ fillAngle: 150 }, 150, 60],
+  ] as const) {
+    const underlay = underlayOf(settings);
+    // Most stitches are rows; the rest travel along the edges.
+    expect(share(underlay, expected)).toBeGreaterThan(0.6);
+    expect(share(underlay, fill)).toBeLessThan(0.2);
+  }
+});
+
 const allPoints = (pattern: EmbPattern) =>
   pattern.stitches.filter(([, , command]) => command === C.STITCH).map(([x, y]) => [x, y]);
 

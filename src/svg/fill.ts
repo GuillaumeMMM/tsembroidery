@@ -14,12 +14,8 @@ export interface Rows {
 
 /** Hidden under the fill, so its stitch length is fixed. */
 const UNDERLAY_STITCH = 3 * UNITS_PER_MM;
-/** Sparse rows across the fill, to hold the fabric before it. */
-const UNDERLAY_ROWS: Rows = {
-  angle: -45,
-  spacing: 2 * UNITS_PER_MM,
-  stitchLength: UNDERLAY_STITCH,
-};
+/** Sparse rows, to hold the fabric before the fill. */
+const UNDERLAY_SPACING = 2 * UNITS_PER_MM;
 const UNDERLAY_INSET = 0.5 * UNITS_PER_MM;
 const MIN_STITCH = 0.5 * UNITS_PER_MM;
 const STAGGERS = 4;
@@ -325,6 +321,11 @@ export function tatami(
   return stitches;
 }
 
+/** Turns an angle in [0, 180) into the equivalent row direction in (-90, 90], so rows run in a consistent order. */
+function rowAngle(degrees: number): number {
+  return degrees > 90 ? degrees - 180 : degrees;
+}
+
 /** Underlay (inset, across the fill), then the fill grown by the pull compensation. */
 export function fillStitches(
   region: Ring[],
@@ -337,7 +338,7 @@ export function fillStitches(
     options.pullCompensation * UNITS_PER_MM,
   );
   const rows: Rows = {
-    angle: 45,
+    angle: rowAngle(options.fillAngle),
     spacing: options.rowSpacing * UNITS_PER_MM,
     stitchLength: options.fillStitchLength * UNITS_PER_MM,
   };
@@ -346,7 +347,11 @@ export function fillStitches(
         offsetRegion(region, -UNDERLAY_INSET),
         travelLength,
         from,
-        UNDERLAY_ROWS,
+        {
+          angle: rowAngle((options.fillAngle + 90) % 180),
+          spacing: UNDERLAY_SPACING,
+          stitchLength: UNDERLAY_STITCH,
+        },
       )
     : [];
   if (underlay.length === 0)

@@ -13,7 +13,6 @@ export interface FlatPathSubpath {
   closed: boolean;
 }
 
-/** Lengths in mm. */
 export interface PathStitchOptions {
   runningStitchLength?: number;
   fillStitchLength?: number;
@@ -21,6 +20,7 @@ export interface PathStitchOptions {
   underlay?: boolean;
   pullCompensation?: number;
   rowSpacing?: number;
+  fillAngle?: number;
 }
 
 export const SATIN_MIN_WIDTH = 1 * UNITS_PER_MM;
@@ -37,20 +37,34 @@ function flattenCubic(
   c1: Point2,
   c2: Point2,
   end: Point2,
-  tolerance: number
+  tolerance: number,
 ): void {
   // Wang's formula: enough segments to stay within `tolerance` of the curve.
   const bend = Math.max(
     Math.hypot(start.x - 2 * c1.x + c2.x, start.y - 2 * c1.y + c2.y),
-    Math.hypot(c1.x - 2 * c2.x + end.x, c1.y - 2 * c2.y + end.y)
+    Math.hypot(c1.x - 2 * c2.x + end.x, c1.y - 2 * c2.y + end.y),
   );
-  const steps = Math.max(1, Math.min(512, Math.ceil(Math.sqrt((0.75 * bend) / Math.max(tolerance, 0.001)))));
+  const steps = Math.max(
+    1,
+    Math.min(
+      512,
+      Math.ceil(Math.sqrt((0.75 * bend) / Math.max(tolerance, 0.001))),
+    ),
+  );
   for (let index = 1; index < steps; index += 1) {
     const t = index / steps;
     const u = 1 - t;
     points.push({
-      x: u * u * u * start.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * end.x,
-      y: u * u * u * start.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * end.y,
+      x:
+        u * u * u * start.x +
+        3 * u * u * t * c1.x +
+        3 * u * t * t * c2.x +
+        t * t * t * end.x,
+      y:
+        u * u * u * start.y +
+        3 * u * u * t * c1.y +
+        3 * u * t * t * c2.y +
+        t * t * t * end.y,
     });
   }
   points.push(end);
@@ -60,7 +74,7 @@ function flattenCubic(
 export function flattenSvgPath(
   data: string,
   tolerance = 0.25,
-  transform?: Matrix
+  transform?: Matrix,
 ): FlatPathSubpath[] {
   const path = new SVGPathData(data)
     .toAbs()
@@ -69,7 +83,14 @@ export function flattenSvgPath(
     .qtToC()
     .aToC();
   if (transform) {
-    path.matrix(transform[0], transform[1], transform[3], transform[4], transform[6], transform[7]);
+    path.matrix(
+      transform[0],
+      transform[1],
+      transform[3],
+      transform[4],
+      transform[6],
+      transform[7],
+    );
   }
 
   const subpaths: FlatPathSubpath[] = [];
@@ -100,7 +121,7 @@ export function flattenSvgPath(
         { x: command.x1, y: command.y1 },
         { x: command.x2, y: command.y2 },
         { x: command.x, y: command.y },
-        tolerance
+        tolerance,
       );
     } else if (command.type === SVGPathData.LINE_TO) {
       points.push({ x: command.x, y: command.y });
@@ -110,7 +131,11 @@ export function flattenSvgPath(
   return subpaths;
 }
 
-export function resample(points: Point2[], closed: boolean, stitchLength: number): Point2[] {
+export function resample(
+  points: Point2[],
+  closed: boolean,
+  stitchLength: number,
+): Point2[] {
   const output: Point2[] = [points[0]];
   const segments = closed ? [...points, points[0]] : points;
   for (let index = 1; index < segments.length; index += 1) {
@@ -143,21 +168,37 @@ function unit(x: number, y: number): Point2 {
  * Zigzag across the line, evenly spaced along it. The direction across is blended
  * between corners, so curves made of straight segments stay smooth.
  */
-function satin(points: Point2[], closed: boolean, width: number, spacing: number): Point2[] {
-  const line = points.filter((point, i) => i === 0 || distance(points[i - 1], point) > 0.000001);
-  if (closed && line.length > 1 && distance(line[0], line[line.length - 1]) > 0.000001) line.push(line[0]);
+function satin(
+  points: Point2[],
+  closed: boolean,
+  width: number,
+  spacing: number,
+): Point2[] {
+  const line = points.filter(
+    (point, i) => i === 0 || distance(points[i - 1], point) > 0.000001,
+  );
+  if (
+    closed &&
+    line.length > 1 &&
+    distance(line[0], line[line.length - 1]) > 0.000001
+  )
+    line.push(line[0]);
   if (line.length < 2) return [...line];
-  const segments = line.slice(1).map((end, i) => unit(end.x - line[i].x, end.y - line[i].y));
+  const segments = line
+    .slice(1)
+    .map((end, i) => unit(end.x - line[i].x, end.y - line[i].y));
   const tangents = line.map((_, i) => {
     let before = segments[i - 1];
     let after = segments[i];
-    if (closed && (i === 0 || i === line.length - 1)) [before, after] = [segments[segments.length - 1], segments[0]];
+    if (closed && (i === 0 || i === line.length - 1))
+      [before, after] = [segments[segments.length - 1], segments[0]];
     if (!before || !after) return before ?? after;
     const blended = unit(before.x + after.x, before.y + after.y);
     return blended.x === 0 && blended.y === 0 ? after : blended;
   });
   const lengths = [0];
-  for (let i = 1; i < line.length; i++) lengths.push(lengths[i - 1] + distance(line[i - 1], line[i]));
+  for (let i = 1; i < line.length; i++)
+    lengths.push(lengths[i - 1] + distance(line[i - 1], line[i]));
   const total = lengths[lengths.length - 1];
   // Same-side peaks are `spacing` apart; a loop needs an even count to close on the same side.
   let count = Math.max(1, Math.ceil(total / (spacing / 2)));
@@ -168,7 +209,13 @@ function satin(points: Point2[], closed: boolean, width: number, spacing: number
   for (let k = 0; k <= count; k++) {
     const along = (total * k) / count;
     while (segment < line.length - 2 && lengths[segment + 1] < along) segment++;
-    const t = Math.min(1, Math.max(0, (along - lengths[segment]) / (lengths[segment + 1] - lengths[segment])));
+    const t = Math.min(
+      1,
+      Math.max(
+        0,
+        (along - lengths[segment]) / (lengths[segment + 1] - lengths[segment]),
+      ),
+    );
     const [a, b] = [line[segment], line[segment + 1]];
     const [ta, tb] = [tangents[segment], tangents[segment + 1]];
     const tangent = unit(ta.x + (tb.x - ta.x) * t, ta.y + (tb.y - ta.y) * t);
@@ -181,8 +228,13 @@ function satin(points: Point2[], closed: boolean, width: number, spacing: number
   return output;
 }
 
+/** Rows are undirected, so angles are kept in [0, 180). */
+function normalizeAngle(degrees: number): number {
+  return ((degrees % 180) + 180) % 180 || 0;
+}
+
 export function resolvePathStitchOptions(
-  options: PathStitchOptions = {}
+  options: PathStitchOptions = {},
 ): Required<PathStitchOptions> {
   const {
     runningStitchLength = 2.5,
@@ -191,15 +243,22 @@ export function resolvePathStitchOptions(
     underlay = true,
     pullCompensation = 0,
     rowSpacing = 0.4,
+    fillAngle = 45,
   } = options;
   if (!Number.isFinite(runningStitchLength) || runningStitchLength <= 0) {
-    throw new RangeError("SVG running stitch length must be a positive finite number");
+    throw new RangeError(
+      "SVG running stitch length must be a positive finite number",
+    );
   }
   if (!Number.isFinite(fillStitchLength) || fillStitchLength <= 0) {
-    throw new RangeError("SVG fill stitch length must be a positive finite number");
+    throw new RangeError(
+      "SVG fill stitch length must be a positive finite number",
+    );
   }
   if (!Number.isFinite(flattenTolerance) || flattenTolerance <= 0) {
-    throw new RangeError("SVG flatten tolerance must be a positive finite number");
+    throw new RangeError(
+      "SVG flatten tolerance must be a positive finite number",
+    );
   }
   if (!Number.isFinite(pullCompensation) || pullCompensation < 0) {
     throw new RangeError("SVG pull compensation must be a non-negative number");
@@ -207,7 +266,18 @@ export function resolvePathStitchOptions(
   if (!Number.isFinite(rowSpacing) || rowSpacing <= 0) {
     throw new RangeError("SVG row spacing must be a positive finite number");
   }
-  return { runningStitchLength, fillStitchLength, flattenTolerance, underlay, pullCompensation, rowSpacing };
+  if (!Number.isFinite(fillAngle)) {
+    throw new RangeError("SVG fill angle must be a finite number");
+  }
+  return {
+    runningStitchLength,
+    fillStitchLength,
+    flattenTolerance,
+    underlay,
+    pullCompensation,
+    rowSpacing,
+    fillAngle: normalizeAngle(fillAngle),
+  };
 }
 
 /** Stroke width in pattern units, after the shape's transform. */
@@ -219,9 +289,13 @@ export function strokeWidth(shape: SvgShape): number {
 export function strokePoints(
   line: FlatPathSubpath,
   width: number,
-  options: Required<PathStitchOptions>
+  options: Required<PathStitchOptions>,
 ): Point2[] {
-  const run = resample(line.points, line.closed, options.runningStitchLength * UNITS_PER_MM);
+  const run = resample(
+    line.points,
+    line.closed,
+    options.runningStitchLength * UNITS_PER_MM,
+  );
   if (width < SATIN_MIN_WIDTH) return run;
   width += 2 * options.pullCompensation * UNITS_PER_MM;
   const spacing = options.rowSpacing * UNITS_PER_MM;

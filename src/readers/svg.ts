@@ -90,6 +90,7 @@ export function stitchSvg(
     underlay: settings.underlay,
     pullCompensation: settings.pullCompensation,
     rowSpacing: settings.rowSpacing,
+    fillAngle: settings.fillAngle,
   });
   const ties = settings.tieStitches ?? 0;
   if (!Number.isInteger(ties) || ties < 0) {

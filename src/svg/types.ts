@@ -73,6 +73,8 @@ export interface SvgReadSettings {
   pullCompensation?: number;
   /** Distance between parallel stitches in fills and satin, in mm. Default 0.4. */
   rowSpacing?: number;
+  /** Direction of fill rows, in degrees: 0 is horizontal, 90 vertical, measured clockwise in SVG coordinates (y down). Default 45. */
+  fillAngle?: number;
   /** Colors closer than this (red-mean distance, 0-765) share one thread. Default 10; 0 merges exact matches only. */
   colorTolerance?: number;
   /** Shrinks and moves the stitches, if needed, so the design stays inside the `size` square: pull compensation, strokes on the edge and content outside the viewBox can overflow it. Default true. */

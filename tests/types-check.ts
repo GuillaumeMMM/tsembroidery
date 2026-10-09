@@ -74,6 +74,7 @@ const readSettings: SvgReadSettings = {
   runningStitchLength: 2.5,
   fillStitchLength: 3,
   rowSpacing: 0.4,
+  fillAngle: 45,
   pullCompensation: 0,
   underlay: true,
   fit: true,
