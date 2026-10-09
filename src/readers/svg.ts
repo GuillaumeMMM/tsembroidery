@@ -1,9 +1,15 @@
 import { EmbConstant } from "../constants.js";
-import { EmbPattern, type Stitch, type StitchBlock } from "../pattern.js";
+import { EmbPattern, type Stitch } from "../pattern.js";
+import type { EmbThread } from "../thread.js";
 import { resolvePathStitchOptions } from "../svg/pathData.js";
 import { normalizeSvg } from "../svg/normalize.js";
-import { planStitches } from "../svg/plan.js";
-import type { SvgReadSettings } from "../svg/types.js";
+import { planStitches, type PlannedBlock } from "../svg/plan.js";
+import type {
+  SvgReadSettings,
+  SvgStitchKind,
+  SvgThreadInfo,
+  ThreadStitchSettings,
+} from "../svg/types.js";
 
 export type SvgInput = string | Uint8Array;
 
@@ -78,6 +84,27 @@ function fitInto(pattern: EmbPattern, limit: number): void {
   }
 }
 
+const KINDS: SvgStitchKind[] = ["fill", "satin", "running"];
+
+/** Sets `thread.extras.svg` on every thread stitched in `blocks`. */
+function recordThreads(
+  blocks: PlannedBlock[],
+  settings: ThreadStitchSettings,
+): void {
+  const kindsByThread = new Map<EmbThread, Set<SvgStitchKind>>();
+  for (const { thread, kind } of blocks) {
+    if (!kindsByThread.has(thread)) kindsByThread.set(thread, new Set());
+    kindsByThread.get(thread)!.add(kind);
+  }
+  for (const [thread, kinds] of kindsByThread) {
+    const info: SvgThreadInfo = {
+      kinds: KINDS.filter((kind) => kinds.has(kind)),
+      settings: { ...settings },
+    };
+    thread.extras.svg = info;
+  }
+}
+
 /** Stitches the SVG in the coordinates of the `size` square at the origin. */
 export function stitchSvg(
   input: SvgInput,
@@ -100,23 +127,31 @@ export function stitchSvg(
   const warnings = [...new Set(normalized.warnings)];
   const fit = settings.fit ?? true;
   const pattern = new EmbPattern();
+  const planned = planStitches(normalized.shapes, stitchOptions);
   // Each run between jumps becomes its own block, so the thread is trimmed before every jump.
-  const runs = planStitches(normalized.shapes, stitchOptions).flatMap(
-    ([stitches, thread]) => {
-      const split: StitchBlock[] = [];
-      for (const stitch of stitches) {
-        if (stitch[2] === EmbConstant.JUMP || split.length === 0)
-          split.push([[], thread]);
-        if (stitch[2] === EmbConstant.STITCH)
-          split[split.length - 1][0].push(stitch);
-      }
-      return split.filter(([run]) => run.length > 0);
-    },
-  );
+  const runs = planned.flatMap(({ stitches, thread, kind }) => {
+    const split: PlannedBlock[] = [];
+    for (const stitch of stitches) {
+      if (stitch[2] === EmbConstant.JUMP || split.length === 0)
+        split.push({ stitches: [], thread, kind });
+      if (stitch[2] === EmbConstant.STITCH)
+        split[split.length - 1].stitches.push(stitch);
+    }
+    return split.filter((run) => run.stitches.length > 0);
+  });
   if (runs.length === 0) return { pattern, warnings };
 
-  for (const [stitches, thread] of runs)
+  for (const { stitches, thread } of runs)
     pattern.addStitchblock([tie(stitches, ties), thread]);
+  recordThreads(runs, {
+    runningStitchLength: stitchOptions.runningStitchLength,
+    fillStitchLength: stitchOptions.fillStitchLength,
+    rowSpacing: stitchOptions.rowSpacing,
+    pullCompensation: stitchOptions.pullCompensation,
+    underlay: stitchOptions.underlay,
+    fillAngle: stitchOptions.fillAngle,
+    tieStitches: ties,
+  });
   // Ends like any other block, with a trim.
   const [x, y] = pattern.stitches[pattern.stitches.length - 1];
   pattern.addCommand(EmbConstant.SEQUENCE_BREAK, x, y);

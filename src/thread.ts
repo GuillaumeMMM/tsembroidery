@@ -1,4 +1,5 @@
 import { pyRound } from "./pyMath.js";
+import type { SvgThreadInfo } from "./svg/types.js";
 
 export type ColorSource = number | EmbThread;
 
@@ -52,6 +53,17 @@ export function findNearestColorIndex(
   return closestIndex;
 }
 
+/**
+ * Data apps attach to a thread, by key. Add typed keys with module augmentation:
+ * `declare module "@guillaumemmm/tsembroidery" { interface ThreadExtras { myApp?: MyData } }`.
+ * Kept in memory only: no reader fills it and no writer saves it.
+ */
+export interface ThreadExtras {
+  [key: string]: unknown;
+  /** Set by `readSvg`. */
+  svg?: SvgThreadInfo;
+}
+
 export class EmbThread {
   color: number = 0xff000000 >>> 0;
   description: string | null = null;
@@ -60,6 +72,7 @@ export class EmbThread {
   brand: string | null = null;
   chart: string | null = null;
   weight: string | null = null;
+  extras: ThreadExtras = {};
 
   setColor(r: number, g: number, b: number): void {
     this.color =

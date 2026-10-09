@@ -36,7 +36,19 @@ import type {
   SvgReadResult,
   SvgReadSettings,
   SvgWriteSettings,
+  SvgThreadInfo,
+  ThreadStitchSettings,
 } from "../dist/index.js";
+
+// Apps type their own extras by augmenting the package (here through its relative path).
+declare module "../dist/index.js" {
+  interface ThreadExtras {
+    bayeux?: { locked: boolean };
+  }
+  interface PatternExtras {
+    bayeux?: { version: number };
+  }
+}
 
 const pattern: EmbPattern = readPes(new Uint8Array());
 const thread = new EmbThread();
@@ -97,5 +109,15 @@ const extents: Extents = fromSvg.extents();
 writePes(pattern, { maxStitch: 10 });
 // @ts-expect-error unknown settings are rejected
 readSvg("<svg/>", { spacing: 1 });
+
+const svgPattern = readSvg("<svg/>", { fillAngle: 0 }).pattern;
+const svgInfo: SvgThreadInfo | undefined = svgPattern.threadlist[0]?.extras.svg;
+const svgSettings: ThreadStitchSettings | undefined = svgInfo?.settings;
+const locked: boolean | undefined = svgPattern.threadlist[0]?.extras.bayeux?.locked;
+svgPattern.extras.bayeux = { version: 1 };
+// @ts-expect-error augmented keys are typed
+svgPattern.extras.bayeux = { version: "1" };
+const untyped: unknown = svgPattern.threadlist[0]?.extras.otherApp;
+void [svgInfo, svgSettings, locked, untyped];
 
 void [svg, preview, converted, warnings, others, parsers, stitch, blocks, extents, fromDst];

@@ -42,10 +42,19 @@ export interface Extents {
   maxY: number;
 }
 
+/**
+ * Data apps attach to a pattern, by key; readers also store file metadata here. Add typed keys with
+ * module augmentation: `declare module "@guillaumemmm/tsembroidery" { interface PatternExtras { myApp?: MyData } }`.
+ */
+export interface PatternExtras {
+  [key: string]: unknown;
+  [key: number]: unknown;
+}
+
 export class EmbPattern {
   stitches: Stitch[] = [];
   threadlist: EmbThread[] = [];
-  extras: Record<string | number, unknown> = {};
+  extras: PatternExtras = {};
   _previousX = 0;
   _previousY = 0;
 
@@ -243,16 +252,20 @@ export class EmbPattern {
     let stitchblock: Stitch[] = [];
     let thread = this.getThreadOrFiller(0);
     let threadIndex = 1;
+    let stitched = false;
     for (const stitch of this.stitches) {
       const flags = stitch[2];
       if (flags === EmbConstant.STITCH) {
         stitchblock.push(stitch);
+        stitched = true;
       } else {
         if (stitchblock.length > 0) {
           yield [stitchblock, thread];
           stitchblock = [];
         }
-        if (flags === EmbConstant.COLOR_CHANGE) {
+        // Deviation from pyembroidery, which only follows COLOR_CHANGE: addStitchblock marks colors
+        // with COLOR_BREAK. Like the encoder, a COLOR_BREAK before any stitch opens the first thread.
+        if (flags === EmbConstant.COLOR_CHANGE || (flags === EmbConstant.COLOR_BREAK && stitched)) {
           thread = this.getThreadOrFiller(threadIndex);
           threadIndex += 1;
         }
@@ -281,14 +294,29 @@ export class EmbPattern {
   *getAsColorblocks(): Generator<[Stitch[], EmbThread]> {
     let threadIndex = 0;
     let lastPos = 0;
+    let afterBreak = false;
     let thread: EmbThread;
     for (let pos = 0; pos < this.stitches.length; pos++) {
-      if (this.stitches[pos][2] !== EmbConstant.COLOR_CHANGE) continue;
+      const command = this.stitches[pos][2];
+      // As in current pyembroidery: a COLOR_BREAK is omitted from the blocks and empty blocks are skipped.
+      if (command === EmbConstant.COLOR_BREAK) {
+        if (lastPos !== pos) {
+          thread = this.getThreadOrFiller(threadIndex);
+          threadIndex += 1;
+          yield [this.stitches.slice(lastPos, pos), thread];
+        }
+        lastPos = pos + 1;
+        afterBreak = true;
+        continue;
+      }
+      if (command !== EmbConstant.COLOR_CHANGE) continue;
       thread = this.getThreadOrFiller(threadIndex);
       threadIndex += 1;
       yield [this.stitches.slice(lastPos, pos), thread];
       lastPos = pos;
+      afterBreak = false;
     }
+    if (afterBreak && lastPos === this.stitches.length) return;
     thread = this.getThreadOrFiller(threadIndex);
     yield [this.stitches.slice(lastPos), thread];
   }

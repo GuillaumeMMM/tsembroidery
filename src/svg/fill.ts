@@ -321,9 +321,10 @@ export function tatami(
   return stitches;
 }
 
-/** Turns an angle in [0, 180) into the equivalent row direction in (-90, 90], so rows run in a consistent order. */
+/** Rows are undirected: turns any angle into the equivalent one in (-90, 90], so equivalent angles give the same stitches. */
 function rowAngle(degrees: number): number {
-  return degrees > 90 ? degrees - 180 : degrees;
+  const angle = ((degrees % 180) + 180) % 180;
+  return angle > 90 ? angle - 180 : angle;
 }
 
 /** Underlay (inset, across the fill), then the fill grown by the pull compensation. */
@@ -348,7 +349,7 @@ export function fillStitches(
         travelLength,
         from,
         {
-          angle: rowAngle((options.fillAngle + 90) % 180),
+          angle: rowAngle(options.fillAngle + 90),
           spacing: UNDERLAY_SPACING,
           stitchLength: UNDERLAY_STITCH,
         },

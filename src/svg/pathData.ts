@@ -228,11 +228,6 @@ function satin(
   return output;
 }
 
-/** Rows are undirected, so angles are kept in [0, 180). */
-function normalizeAngle(degrees: number): number {
-  return ((degrees % 180) + 180) % 180 || 0;
-}
-
 export function resolvePathStitchOptions(
   options: PathStitchOptions = {},
 ): Required<PathStitchOptions> {
@@ -276,7 +271,7 @@ export function resolvePathStitchOptions(
     underlay,
     pullCompensation,
     rowSpacing,
-    fillAngle: normalizeAngle(fillAngle),
+    fillAngle,
   };
 }
 

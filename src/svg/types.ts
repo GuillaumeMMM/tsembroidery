@@ -52,7 +52,30 @@ export interface SvgViewport {
 }
 
 /** A `DOMParser` class: the browser's, or one from a DOM library such as happy-dom. */
-export type SvgDomParser = new () => { parseFromString(source: string, type: "image/svg+xml"): unknown };
+export type SvgDomParser = new () => {
+  parseFromString(source: string, type: "image/svg+xml"): unknown;
+};
+
+/** How a thread's stitches are made: tatami fill, satin stroke, or running stitches along a thin stroke. */
+export type SvgStitchKind = "fill" | "satin" | "running";
+
+/** The `readSvg` settings that shape a thread's stitches, as passed or defaulted. Lengths in mm. */
+export interface ThreadStitchSettings {
+  runningStitchLength: number;
+  fillStitchLength: number;
+  rowSpacing: number;
+  pullCompensation: number;
+  underlay: boolean;
+  fillAngle: number;
+  tieStitches: number;
+}
+
+/** What `readSvg` stitched with a thread, in `thread.extras.svg`. */
+export interface SvgThreadInfo {
+  /** Every kind of stitch in this thread. */
+  kinds: SvgStitchKind[];
+  settings: ThreadStitchSettings;
+}
 
 export interface SvgReadSettings {
   /** Parses the SVG. Default: the global `DOMParser`, which browsers have and Node doesn't. */

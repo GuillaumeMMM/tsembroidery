@@ -803,6 +803,18 @@ test("readSvg: groups colors and moves on to the nearest remaining color", () =>
   expect(pattern.countStitchCommands(C.COLOR_BREAK)).toBe(3);
 });
 
+test("readSvg: getAsStitchblock and getStablePattern follow the COLOR_BREAKs between colors", () => {
+  const pattern = readSvg(svg100(`
+    <rect x="0" y="0" width="10" height="10" fill="#ff0000"/>
+    <rect x="30" y="0" width="10" height="10" fill="#0000ff"/>`)).pattern;
+  const colors = (p: EmbPattern) => [...new Set(blocks(p).map(([, thread]) => thread.hexColor()))];
+  expect(colors(pattern)).toStrictEqual(["#ff0000", "#0000ff"]);
+  expect(colors(pattern)).toStrictEqual(colors(pattern.getNormalizedPattern()));
+  const stable = pattern.getStablePattern();
+  expect(stable.threadlist.map((thread) => thread.hexColor())).toStrictEqual(["#ff0000", "#0000ff"]);
+  expect(colors(stable)).toStrictEqual(["#ff0000", "#0000ff"]);
+});
+
 const fillBlock = (settings: object) =>
   blocks(readSvg(svg100(`<rect x="10" y="10" width="20" height="20" fill="#e53935"/>`), settings).pattern)[0][0];
 const xExtent = (block: number[][]) => [Math.min(...block.map(([x]) => x)), Math.max(...block.map(([x]) => x))];

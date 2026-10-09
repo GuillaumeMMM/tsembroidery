@@ -18,12 +18,18 @@ export { writePes } from "./writePes.js";
 export type { PesWriteSettings } from "./writePes.js";
 export { readSvg } from "./readers/svg.js";
 export type { SvgDomParser, SvgInput, SvgReadResult, SvgReadSettings } from "./readers/svg.js";
+export type {
+  SvgStitchKind,
+  SvgThreadInfo,
+  ThreadStitchSettings,
+} from "./svg/types.js";
 export { writeSvg } from "./writeSvg.js";
 export type { SvgWriteSettings } from "./writeSvg.js";
 
 export { EmbPattern } from "./pattern.js";
-export type { Stitch, StitchBlock, ThreadSpec, Extents } from "./pattern.js";
+export type { Stitch, StitchBlock, ThreadSpec, Extents, PatternExtras } from "./pattern.js";
 export { EmbThread } from "./thread.js";
+export type { ThreadExtras } from "./thread.js";
 export { EmbConstant } from "./constants.js";
 export type { Command } from "./constants.js";
 export type { EncoderSettings, PointLike } from "./encoder.js";

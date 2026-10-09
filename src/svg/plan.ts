@@ -1,5 +1,5 @@
 import { EmbConstant } from "../constants.js";
-import type { Stitch, StitchBlock } from "../pattern.js";
+import type { Stitch } from "../pattern.js";
 import type { EmbThread } from "../thread.js";
 import { fillStitches } from "./fill.js";
 import {
@@ -25,10 +25,18 @@ import {
   type PathStitchOptions,
   type Point2,
 } from "./pathData.js";
-import type { SvgShape } from "./types.js";
+import type { SvgShape, SvgStitchKind } from "./types.js";
+
+/** Stitches of one item, with their stitch kind. */
+export interface PlannedBlock {
+  stitches: Stitch[];
+  thread: EmbThread;
+  kind: SvgStitchKind;
+}
 
 interface Item {
   color: EmbThread;
+  kind: SvgStitchKind;
   /** Running strokes (1) are stitched after fills and satin (0), so they stay on top. */
   layer: 0 | 1;
   starts: Point2[];
@@ -41,10 +49,16 @@ function nearest(points: Point2[], from: Point2): number {
   return points.reduce((best, point, index) => (distance(point, from) < distance(points[best], from) ? index : best), 0);
 }
 
-function strokeItem(line: FlatPathSubpath, width: number, color: EmbThread, options: Required<PathStitchOptions>): Item {
+function strokeItem(
+  line: FlatPathSubpath,
+  width: number,
+  color: EmbThread,
+  options: Required<PathStitchOptions>,
+): Item {
   const { points, closed } = line;
   return {
     color,
+    kind: width >= SATIN_MIN_WIDTH ? "satin" : "running",
     layer: width >= SATIN_MIN_WIDTH ? 0 : 1,
     starts: closed ? points : [points[0], points[points.length - 1]],
     stitch(from) {
@@ -63,6 +77,7 @@ function strokeItem(line: FlatPathSubpath, width: number, color: EmbThread, opti
 function fillItem(region: Ring[], color: EmbThread, options: Required<PathStitchOptions>): Item {
   return {
     color,
+    kind: "fill",
     layer: 0,
     starts: region.flat(),
     stitch: (from) => fillStitches(region, options, from),
@@ -127,10 +142,9 @@ function visibleItems(shapes: SvgShape[], options: Required<PathStitchOptions>):
  * Fills and satin first, running strokes last. Within each, the next block is the nearest one
  * of the current color, or of any color once the current color is done.
  */
-export function planStitches(shapes: SvgShape[], options: PathStitchOptions = {}): StitchBlock[] {
-  const resolved = resolvePathStitchOptions(options);
-  const items = visibleItems(shapes, resolved);
-  const blocks: StitchBlock[] = [];
+export function planStitches(shapes: SvgShape[], options: PathStitchOptions = {}): PlannedBlock[] {
+  const items = visibleItems(shapes, resolvePathStitchOptions(options));
+  const blocks: PlannedBlock[] = [];
   let position: Point2 | null = null;
   let color: EmbThread | null = null;
   for (const layer of [0, 1]) {
@@ -151,7 +165,7 @@ export function planStitches(shapes: SvgShape[], options: PathStitchOptions = {}
       pool.splice(pool.indexOf(item), 1);
       const stitches: Stitch[] = item.stitch(from);
       if (stitches.length === 0) continue;
-      blocks.push([stitches, item.color]);
+      blocks.push({ stitches, thread: item.color, kind: item.kind });
       const [x, y] = stitches[stitches.length - 1];
       position = { x, y };
       color = item.color;

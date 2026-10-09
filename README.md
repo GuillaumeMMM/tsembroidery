@@ -85,6 +85,25 @@ const { pattern } = readSvg(svgText, { DOMParser: new Window().DOMParser });
 | `colorTolerance`      | `10`    | Colors closer than this (0–765) share one thread. `0` keeps every distinct color.                                                                                                                    |
 | `flattenTolerance`    | `0.05`  | Maximum error when curves are turned into lines, in mm.                                                                                                                                              |
 
+#### Thread records
+
+Each thread records, in `thread.extras.svg`, the `kinds` of stitches it holds (`"fill"`, `"satin"`, `"running"`) and the `settings` it was stitched with.
+
+### App data
+
+`pattern.extras` and `thread.extras` hold data apps attach by key; readers also put file metadata (name, author…) in `pattern.extras`. Thread extras are kept in memory only: no reader fills them and no writer saves them. A thread object can be in several patterns, which then share its extras. Type your own keys with module augmentation:
+
+```ts
+declare module "@guillaumemmm/tsembroidery" {
+  interface ThreadExtras {
+    myApp?: { locked: boolean };
+  }
+  interface PatternExtras {
+    myApp?: { version: number };
+  }
+}
+```
+
 ### Writing settings
 
 Every writer takes `encode` (`true` by default: split moves too long for the format first) and the encoder settings.

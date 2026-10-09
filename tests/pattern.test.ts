@@ -335,6 +335,23 @@ test("getStablePattern strips jumps/trims into breaks", () => {
   expect(commands.filter((c) => c === C.STITCH).length).toBe(3);
 });
 
+test("COLOR_BREAK from addStitchblock advances the thread in block iterators", () => {
+  const red = thread(255, 0, 0);
+  const blue = thread(0, 0, 255);
+  const p = new EmbPattern();
+  p.addStitchblock([[[0, 0, C.STITCH], [10, 0, C.STITCH]], red]);
+  p.addStitchblock([[[20, 0, C.STITCH]], red]);
+  p.addStitchblock([[[30, 0, C.STITCH]], blue]);
+  const colors = (blocks: Iterable<[unknown, EmbThread]>) => [...blocks].map(([, t]) => t.hexColor());
+  expect(colors(p.getAsStitchblock())).toStrictEqual(["#ff0000", "#ff0000", "#0000ff"]);
+  const colorblocks = [...p.getAsColorblocks()];
+  expect(colors(colorblocks)).toStrictEqual(["#ff0000", "#0000ff"]);
+  expect(colorblocks.map(([block]) => block.some((s) => s[2] === C.COLOR_BREAK))).toStrictEqual([false, false]);
+  const stable = p.getStablePattern();
+  expect(stable.threadlist).toStrictEqual([red, blue]);
+  expect(stable.stitches).toStrictEqual(p.stitches);
+});
+
 test("getPatternMergeJumps replaces jump runs with STITCH_BREAK", () => {
   const p = new EmbPattern();
   p.stitchAbs(0, 0);
