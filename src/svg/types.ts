@@ -70,11 +70,30 @@ export interface ThreadStitchSettings {
   tieStitches: number;
 }
 
+/** A point in pattern units (0.1 mm). */
+export interface ZonePoint {
+  x: number;
+  y: number;
+}
+
+/** One part of a zone, in pattern units (0.1 mm). */
+export type ZonePart =
+  /** Areas: outer rings and holes, in any order or direction. */
+  | { kind: "fill"; rings: ZonePoint[][] }
+  /** A satin column along `points`, `width` across before pull compensation. Below 1 mm, running stitches. */
+  | { kind: "satin"; points: ZonePoint[]; closed: boolean; width: number }
+  | { kind: "running"; points: ZonePoint[]; closed: boolean };
+
+/** What a thread covers, as plain data: `stitchZone` stitches it with any settings. */
+export type StitchZone = ZonePart[];
+
 /** What `readSvg` stitched with a thread, in `thread.extras.svg`. */
 export interface SvgThreadInfo {
   /** Every kind of stitch in this thread. */
   kinds: SvgStitchKind[];
   settings: ThreadStitchSettings;
+  /** The visible parts this thread stitched, in the pattern's final coordinates. */
+  zone: StitchZone;
 }
 
 export interface SvgReadSettings {

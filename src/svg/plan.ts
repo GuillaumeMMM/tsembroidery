@@ -16,27 +16,29 @@ import {
 import { UNITS_PER_MM } from "./numbers.js";
 import {
   flattenSvgPath,
-  resolvePathStitchOptions,
   SATIN_MAX_WIDTH,
   SATIN_MIN_WIDTH,
   strokePoints,
   strokeWidth,
   type FlatPathSubpath,
-  type PathStitchOptions,
   type Point2,
 } from "./pathData.js";
-import type { SvgShape, SvgStitchKind } from "./types.js";
+import type {
+  SvgShape,
+  ThreadStitchSettings,
+  ZonePart,
+} from "./types.js";
 
-/** Stitches of one item, with their stitch kind. */
-export interface PlannedBlock {
+/** Stitches of one zone part, in stitching order. */
+export interface PlannedBlock<C = EmbThread> {
   stitches: Stitch[];
-  thread: EmbThread;
-  kind: SvgStitchKind;
+  thread: C;
+  part: ZonePart;
 }
 
-interface Item {
-  color: EmbThread;
-  kind: SvgStitchKind;
+interface Item<C> {
+  color: C;
+  part: ZonePart;
   /** Running strokes (1) are stitched after fills and satin (0), so they stay on top. */
   layer: 0 | 1;
   starts: Point2[];
@@ -49,16 +51,16 @@ function nearest(points: Point2[], from: Point2): number {
   return points.reduce((best, point, index) => (distance(point, from) < distance(points[best], from) ? index : best), 0);
 }
 
-function strokeItem(
-  line: FlatPathSubpath,
-  width: number,
-  color: EmbThread,
-  options: Required<PathStitchOptions>,
-): Item {
-  const { points, closed } = line;
+function strokeItem<C>(
+  part: ZonePart & { kind: "satin" | "running" },
+  color: C,
+  settings: ThreadStitchSettings,
+): Item<C> {
+  const { points, closed } = part;
+  const width = part.kind === "satin" ? part.width : 0;
   return {
     color,
-    kind: width >= SATIN_MIN_WIDTH ? "satin" : "running",
+    part,
     layer: width >= SATIN_MIN_WIDTH ? 0 : 1,
     starts: closed ? points : [points[0], points[points.length - 1]],
     stitch(from) {
@@ -69,19 +71,30 @@ function strokeItem(
       } else if (from !== null && distance(points[points.length - 1], from) < distance(points[0], from)) {
         ordered = [...points].reverse();
       }
-      return strokePoints({ points: ordered, closed }, width, options).map(({ x, y }) => [x, y, EmbConstant.STITCH]);
+      return strokePoints({ points: ordered, closed }, width, settings).map(({ x, y }) => [x, y, EmbConstant.STITCH]);
     },
   };
 }
 
-function fillItem(region: Ring[], color: EmbThread, options: Required<PathStitchOptions>): Item {
+function fillItem<C>(part: ZonePart & { kind: "fill" }, color: C, settings: ThreadStitchSettings): Item<C> {
   return {
     color,
-    kind: "fill",
+    part,
     layer: 0,
-    starts: region.flat(),
-    stitch: (from) => fillStitches(region, options, from),
+    starts: part.rings.flat(),
+    stitch: (from) => fillStitches(part.rings, settings, from),
   };
+}
+
+function partItem<C>(part: ZonePart, color: C, settings: ThreadStitchSettings): Item<C> {
+  return part.kind === "fill" ? fillItem(part, color, settings) : strokeItem(part, color, settings);
+}
+
+/** A stroke line as a zone part: satin from 1 mm wide, running stitches below. */
+function linePart(line: FlatPathSubpath, width: number): ZonePart {
+  return width >= SATIN_MIN_WIDTH
+    ? { kind: "satin", points: line.points, closed: line.closed, width }
+    : { kind: "running", points: line.points, closed: line.closed };
 }
 
 /** The area a shape's clip paths leave visible, or null when it has none. */
@@ -98,9 +111,12 @@ function clipRegion(shape: SvgShape, tolerance: number): Ring[] | null {
 }
 
 /** Removes what clip paths and later shapes hide, as SVG paints them. Returns items in document order. */
-function visibleItems(shapes: SvgShape[], options: Required<PathStitchOptions>): Item[] {
-  const tolerance = options.flattenTolerance * UNITS_PER_MM;
-  const items: Item[] = [];
+function visibleItems(
+  shapes: SvgShape[],
+  settings: ThreadStitchSettings,
+  tolerance: number,
+): Item<EmbThread>[] {
+  const items: Item<EmbThread>[] = [];
   let above: Ring[] = [];
   for (const shape of [...shapes].reverse()) {
     const clip = clipRegion(shape, tolerance);
@@ -116,11 +132,11 @@ function visibleItems(shapes: SvgShape[], options: Required<PathStitchOptions>):
       if (width > SATIN_MAX_WIDTH) {
         // Too wide for satin: fill the area the stroke covers.
         for (const island of islands(subtract(outline, above)).reverse()) {
-          items.push(fillItem(island, style.color, options));
+          items.push(fillItem({ kind: "fill", rings: island }, style.color, settings));
         }
       } else {
         for (const line of clipLines(lines, above).reverse()) {
-          items.push(strokeItem(line, width, style.color, options));
+          items.push(partItem(linePart(line, width), style.color, settings));
         }
       }
       // Thin running lines have no area to hide anything.
@@ -130,7 +146,7 @@ function visibleItems(shapes: SvgShape[], options: Required<PathStitchOptions>):
       const subpaths = flattenSvgPath(shape.fill.d, tolerance, shape.transform);
       const region = clipped(unionRings(subpaths.map((subpath) => subpath.points), shape.fill.style.rule));
       for (const island of islands(subtract(region, above)).reverse()) {
-        items.push(fillItem(island, shape.fill.style.color, options));
+        items.push(fillItem({ kind: "fill", rings: island }, shape.fill.style.color, settings));
       }
       above = unite(above, region);
     }
@@ -142,18 +158,17 @@ function visibleItems(shapes: SvgShape[], options: Required<PathStitchOptions>):
  * Fills and satin first, running strokes last. Within each, the next block is the nearest one
  * of the current color, or of any color once the current color is done.
  */
-export function planStitches(shapes: SvgShape[], options: PathStitchOptions = {}): PlannedBlock[] {
-  const items = visibleItems(shapes, resolvePathStitchOptions(options));
-  const blocks: PlannedBlock[] = [];
-  let position: Point2 | null = null;
-  let color: EmbThread | null = null;
+function orderItems<C>(items: Item<C>[], start: Point2 | null): PlannedBlock<C>[] {
+  const blocks: PlannedBlock<C>[] = [];
+  let position: Point2 | null = start;
+  let color: C | null = null;
   for (const layer of [0, 1]) {
     const pool = items.filter((item) => item.layer === layer);
     while (pool.length > 0) {
       const sameColor = pool.filter((item) => item.color === color);
       const candidates = sameColor.length > 0 ? sameColor : pool;
       const from: Point2 | null = position;
-      const item: Item =
+      const item: Item<C> =
         from === null
           ? candidates[0]
           : candidates.reduce((best, candidate) =>
@@ -165,11 +180,29 @@ export function planStitches(shapes: SvgShape[], options: PathStitchOptions = {}
       pool.splice(pool.indexOf(item), 1);
       const stitches: Stitch[] = item.stitch(from);
       if (stitches.length === 0) continue;
-      blocks.push({ stitches, thread: item.color, kind: item.kind });
+      blocks.push({ stitches, thread: item.color, part: item.part });
       const [x, y] = stitches[stitches.length - 1];
       position = { x, y };
       color = item.color;
     }
   }
   return blocks;
+}
+
+/** Stitches the visible parts of `shapes`, grouped by color. `flattenTolerance` in mm. */
+export function planStitches(
+  shapes: SvgShape[],
+  settings: ThreadStitchSettings,
+  flattenTolerance: number,
+): PlannedBlock[] {
+  return orderItems(visibleItems(shapes, settings, flattenTolerance * UNITS_PER_MM), null);
+}
+
+/** Stitches every part of `zone`, in the same order rules as `planStitches`, starting near `from`. */
+export function planZone(
+  zone: ZonePart[],
+  settings: ThreadStitchSettings,
+  from: Point2 | null,
+): PlannedBlock<null>[] {
+  return orderItems(zone.map((part) => partItem(part, null, settings)), from);
 }

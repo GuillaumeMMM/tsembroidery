@@ -33,8 +33,10 @@ test("readSvg: records the stitch kinds and settings of each thread in thread.ex
   // #fe0000 merges into #ff0000, so threads and their records stay aligned.
   expect(pattern.threadlist.map((thread) => thread.hexColor())).toStrictEqual(["#ff0000", "#0000ff"]);
   const [red, blue] = pattern.threadlist.map((thread) => thread.extras.svg);
-  expect(red).toStrictEqual({ kinds: ["fill"], settings: DEFAULTS });
-  expect(blue).toStrictEqual({ kinds: ["fill"], settings: DEFAULTS });
+  expect(red).toStrictEqual({ kinds: ["fill"], settings: DEFAULTS, zone: expect.any(Array) });
+  expect(blue).toStrictEqual({ kinds: ["fill"], settings: DEFAULTS, zone: expect.any(Array) });
+  // Both red squares are in the red zone.
+  expect(red!.zone.map((part) => part.kind)).toStrictEqual(["fill", "fill"]);
 });
 
 test("readSvg: records every stitch kind of a thread", () => {

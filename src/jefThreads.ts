@@ -93,7 +93,7 @@ export class EmbThreadJef extends EmbThread {
   }
 }
 
-/** Index 0 is a placeholder: JEF uses it for stops. */
+/** Janome's JEF thread chart. Index 0 is a placeholder: JEF uses it for stops. Fresh threads on every call. */
 export function getJefThreadSet(): (EmbThreadJef | null)[] {
   return [null, ...JEF_THREADS.map(([color, description, catalog]) => new EmbThreadJef(color, description, catalog))];
 }

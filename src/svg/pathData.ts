@@ -1,7 +1,7 @@
 import { SVGPathData } from "svg-pathdata";
 import type { Matrix } from "../matrix.js";
 import { UNITS_PER_MM } from "./numbers.js";
-import type { SvgShape } from "./types.js";
+import type { SvgShape, ThreadStitchSettings } from "./types.js";
 
 export interface Point2 {
   x: number;
@@ -11,16 +11,6 @@ export interface Point2 {
 export interface FlatPathSubpath {
   points: Point2[];
   closed: boolean;
-}
-
-export interface PathStitchOptions {
-  runningStitchLength?: number;
-  fillStitchLength?: number;
-  flattenTolerance?: number;
-  underlay?: boolean;
-  pullCompensation?: number;
-  rowSpacing?: number;
-  fillAngle?: number;
 }
 
 export const SATIN_MIN_WIDTH = 1 * UNITS_PER_MM;
@@ -228,51 +218,62 @@ function satin(
   return output;
 }
 
-export function resolvePathStitchOptions(
-  options: PathStitchOptions = {},
-): Required<PathStitchOptions> {
+/**
+ * Checks stitch settings and fills in the defaults, the same rules `readSvg` applies.
+ * Throws a RangeError for an invalid value. Lengths in mm, `fillAngle` in degrees.
+ */
+export function resolveStitchSettings(
+  settings: Partial<ThreadStitchSettings> = {},
+): ThreadStitchSettings {
   const {
     runningStitchLength = 2.5,
     fillStitchLength = 3,
-    flattenTolerance = 0.05,
-    underlay = true,
-    pullCompensation = 0,
     rowSpacing = 0.4,
+    pullCompensation = 0,
+    underlay = true,
     fillAngle = 45,
-  } = options;
+    tieStitches = 0,
+  } = settings;
+  const invalid = (message: string) => new RangeError(`Stitch settings: ${message}`);
   if (!Number.isFinite(runningStitchLength) || runningStitchLength <= 0) {
-    throw new RangeError(
-      "SVG running stitch length must be a positive finite number",
-    );
+    throw invalid("running stitch length must be a positive finite number");
   }
   if (!Number.isFinite(fillStitchLength) || fillStitchLength <= 0) {
-    throw new RangeError(
-      "SVG fill stitch length must be a positive finite number",
-    );
+    throw invalid("fill stitch length must be a positive finite number");
   }
+  if (!Number.isFinite(pullCompensation) || pullCompensation < 0) {
+    throw invalid("pull compensation must be a non-negative number");
+  }
+  if (!Number.isFinite(rowSpacing) || rowSpacing <= 0) {
+    throw invalid("row spacing must be a positive finite number");
+  }
+  if (typeof underlay !== "boolean") {
+    throw invalid("underlay must be a boolean");
+  }
+  if (!Number.isFinite(fillAngle)) {
+    throw invalid("fill angle must be a finite number");
+  }
+  if (!Number.isInteger(tieStitches) || tieStitches < 0) {
+    throw invalid("tieStitches must be a non-negative integer");
+  }
+  return {
+    runningStitchLength,
+    fillStitchLength,
+    rowSpacing,
+    pullCompensation,
+    underlay,
+    fillAngle,
+    tieStitches,
+  };
+}
+
+export function resolveFlattenTolerance(flattenTolerance = 0.05): number {
   if (!Number.isFinite(flattenTolerance) || flattenTolerance <= 0) {
     throw new RangeError(
       "SVG flatten tolerance must be a positive finite number",
     );
   }
-  if (!Number.isFinite(pullCompensation) || pullCompensation < 0) {
-    throw new RangeError("SVG pull compensation must be a non-negative number");
-  }
-  if (!Number.isFinite(rowSpacing) || rowSpacing <= 0) {
-    throw new RangeError("SVG row spacing must be a positive finite number");
-  }
-  if (!Number.isFinite(fillAngle)) {
-    throw new RangeError("SVG fill angle must be a finite number");
-  }
-  return {
-    runningStitchLength,
-    fillStitchLength,
-    flattenTolerance,
-    underlay,
-    pullCompensation,
-    rowSpacing,
-    fillAngle,
-  };
+  return flattenTolerance;
 }
 
 /** Stroke width in pattern units, after the shape's transform. */
@@ -284,7 +285,7 @@ export function strokeWidth(shape: SvgShape): number {
 export function strokePoints(
   line: FlatPathSubpath,
   width: number,
-  options: Required<PathStitchOptions>,
+  options: ThreadStitchSettings,
 ): Point2[] {
   const run = resample(
     line.points,

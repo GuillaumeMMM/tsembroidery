@@ -17,6 +17,7 @@ export class EmbThreadPec extends EmbThread {
   }
 }
 
+/** Brother's PEC thread chart, as in pyembroidery. PES and PEC files store indexes into it. Fresh threads on every call. */
 export function getThreadSet(): EmbThreadPec[] {
   return [
     new EmbThreadPec(0, 0, 0, "Unknown", "0"),

@@ -60,6 +60,9 @@ Coordinates in patterns are in **0.1 mm** (x to the right, y down). Lengths in t
 | `writeXxx(pattern: EmbPattern, settings?: XxxWriteSettings)`       | `Uint8Array`            | Encodes a pattern as a `.xxx` file.                                               |
 | `readSvg(input: string \| Uint8Array, settings?: SvgReadSettings)` | `{ pattern, warnings }` | Turns SVG into stitches. `warnings` lists the parts of the SVG that were skipped. |
 | `writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings)`       | `string`                | Draws a pattern as SVG, one path per run of stitches.                             |
+| `stitchZone(zone: StitchZone, settings?, from?)`                   | `Stitch[]`              | Stitches a thread's zone with new settings. See [Zones](#zones).                  |
+| `resolveStitchSettings(settings?: Partial<ThreadStitchSettings>)`  | `ThreadStitchSettings`  | Checks stitch settings and fills in `readSvg`'s defaults.                         |
+| `getThreadSet()` / `getJefThreadSet()`                             | `EmbThread[]`           | Brother (PES/PEC) and Janome (JEF) thread charts, fresh threads on every call.    |
 
 `readSvg` needs a `DOMParser`. Browsers have one; in Node, pass one in the settings.
 
@@ -87,7 +90,26 @@ const { pattern } = readSvg(svgText, { DOMParser: new Window().DOMParser });
 
 #### Thread records
 
-Each thread records, in `thread.extras.svg`, the `kinds` of stitches it holds (`"fill"`, `"satin"`, `"running"`) and the `settings` it was stitched with.
+Each thread records, in `thread.extras.svg`, the `kinds` of stitches it holds (`"fill"`, `"satin"`, `"running"`).
+
+Every `threadlist` entry has its own thread object: a color stitched again after other colors (thin lines come last) gets a copy of its thread, with its own record.
+
+### Zones
+
+A zone is what a thread covers, as plain data in pattern units (0.1 mm), so it can go to a web worker:
+
+```ts
+type ZonePart =
+  | { kind: "fill"; rings: { x: number; y: number }[][] }
+  | {
+      kind: "satin";
+      points: { x: number; y: number }[];
+      closed: boolean;
+      width: number;
+    }
+  | { kind: "running"; points: { x: number; y: number }[]; closed: boolean };
+type StitchZone = ZonePart[];
+```
 
 ### App data
 

@@ -1,7 +1,8 @@
 import { EmbConstant } from "../constants.js";
 import type { Stitch } from "../pattern.js";
 import { UNITS_PER_MM } from "./numbers.js";
-import { resample, type PathStitchOptions, type Point2 } from "./pathData.js";
+import { resample, type Point2 } from "./pathData.js";
+import type { ThreadStitchSettings } from "./types.js";
 import { clipLines, offsetRegion, type Ring } from "./geometry.js";
 
 export interface Rows {
@@ -330,7 +331,7 @@ function rowAngle(degrees: number): number {
 /** Underlay (inset, across the fill), then the fill grown by the pull compensation. */
 export function fillStitches(
   region: Ring[],
-  options: Required<PathStitchOptions>,
+  options: ThreadStitchSettings,
   from: Point2 | null = null,
 ): Stitch[] {
   const travelLength = options.runningStitchLength * UNITS_PER_MM;

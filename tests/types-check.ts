@@ -38,7 +38,10 @@ import type {
   SvgWriteSettings,
   SvgThreadInfo,
   ThreadStitchSettings,
+  StitchZone,
+  ZonePart,
 } from "../dist/index.js";
+import { stitchZone, stitchOutline, resolveStitchSettings, getThreadSet, getJefThreadSet } from "../dist/index.js";
 
 // Apps type their own extras by augmenting the package (here through its relative path).
 declare module "../dist/index.js" {
@@ -118,6 +121,13 @@ svgPattern.extras.bayeux = { version: 1 };
 // @ts-expect-error augmented keys are typed
 svgPattern.extras.bayeux = { version: "1" };
 const untyped: unknown = svgPattern.threadlist[0]?.extras.otherApp;
-void [svgInfo, svgSettings, locked, untyped];
+const zone: StitchZone = svgInfo?.zone ?? stitchOutline(svgPattern.stitches);
+const part: ZonePart = { kind: "satin", points: [{ x: 0, y: 0 }], closed: false, width: 20 };
+const restitched: Stitch[] = stitchZone([...zone, part], { ...svgSettings, fillAngle: 0 }, { x: 0, y: 0 });
+const resolvedSettings: ThreadStitchSettings = resolveStitchSettings({ rowSpacing: 0.5 });
+// @ts-expect-error zone parts need their fields
+stitchZone([{ kind: "satin", points: [] }]);
+const charts: EmbThread[] = [...getThreadSet(), ...getJefThreadSet().filter((t) => t !== null)];
+void [svgInfo, svgSettings, locked, untyped, restitched, resolvedSettings, charts];
 
 void [svg, preview, converted, warnings, others, parsers, stitch, blocks, extents, fromDst];

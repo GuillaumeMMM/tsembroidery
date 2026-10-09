@@ -9,6 +9,7 @@ import {
   inflatePathsD,
   JoinType,
   PolyTreeD,
+  simplifyPathsD,
   unionD,
   type PathD,
   type PathsD,
@@ -80,6 +81,21 @@ export function islands(region: Ring[]): Ring[][] {
 export function offsetRegion(region: Ring[], delta: number): Ring[] {
   if (delta === 0 || region.length === 0) return region;
   return clean(inflatePathsD(region, delta, JoinType.Miter, EndType.Polygon, 2, PRECISION));
+}
+
+/**
+ * The area thread laid along `lines` covers, `width` wide, with gaps narrower than `2 * close`
+ * filled and edges simplified within `tolerance`. Returned as islands.
+ */
+export function coverage(lines: Point2[][], width: number, close: number, tolerance: number): Ring[][] {
+  const paths = lines.filter((line) => line.length > 0);
+  if (paths.length === 0) return [];
+  let region: PathsD = inflatePathsD(paths, width / 2, JoinType.Round, EndType.Round, 2, PRECISION);
+  if (close > 0) {
+    region = inflatePathsD(region, close, JoinType.Round, EndType.Polygon, 2, PRECISION);
+    region = inflatePathsD(region, -close, JoinType.Round, EndType.Polygon, 2, PRECISION);
+  }
+  return islands(clean(simplifyPathsD(region, tolerance, true)));
 }
 
 const JOINS: Record<string, JoinType> = { round: JoinType.Round, bevel: JoinType.Bevel };
