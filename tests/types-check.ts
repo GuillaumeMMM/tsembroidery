@@ -124,7 +124,8 @@ const untyped: unknown = svgPattern.threadlist[0]?.extras.otherApp;
 const zone: StitchZone = svgInfo?.zone ?? stitchOutline(svgPattern.stitches);
 const part: ZonePart = { kind: "satin", points: [{ x: 0, y: 0 }], closed: false, width: 20 };
 const restitched: Stitch[] = stitchZone([...zone, part], { ...svgSettings, fillAngle: 0 }, { x: 0, y: 0 });
-const resolvedSettings: ThreadStitchSettings = resolveStitchSettings({ rowSpacing: 0.5 });
+const resolvedSettings: ThreadStitchSettings = resolveStitchSettings({ rowSpacing: 0.5, minStitchLength: 0.3 });
+readSvg("<svg/>", { minStitchLength: 0.3 });
 // @ts-expect-error zone parts need their fields
 stitchZone([{ kind: "satin", points: [] }]);
 const charts: EmbThread[] = [...getThreadSet(), ...getJefThreadSet().filter((t) => t !== null)];

@@ -11,6 +11,8 @@ export interface Rows {
   spacing: number;
   /** Longest stitch along a row. */
   stitchLength: number;
+  /** Shortest stitch inside a row and along travel; row ends stay exact. */
+  minLength: number;
 }
 
 /** Hidden under the fill, so its stitch length is fixed. */
@@ -180,15 +182,17 @@ function rowPoints(
   to: number,
   y: number,
   length: number,
+  minLength: number,
 ): Point2[] {
+  const margin = Math.max(MIN_STITCH, minLength);
   const offset =
     ((((row % STAGGERS) + STAGGERS) % STAGGERS) / STAGGERS) * length;
   const low = Math.min(from, to);
   const high = Math.max(from, to);
   const grid: number[] = [];
   for (
-    let k = Math.ceil((low + MIN_STITCH - offset) / length);
-    k * length + offset <= high - MIN_STITCH;
+    let k = Math.ceil((low + margin - offset) / length);
+    k * length + offset <= high - margin;
     k += 1
   ) {
     grid.push(k * length + offset);
@@ -207,7 +211,7 @@ function stitchSection(
   section: Section,
   entry: Crossing,
   out: Point2[],
-  length: number,
+  { stitchLength: length, minLength }: Rows,
 ): Crossing {
   const forward = entry === section[0].a || entry === section[0].b;
   const rows = forward ? section : [...section].reverse();
@@ -219,7 +223,7 @@ function stitchSection(
       : [segment.b, segment.a];
     appendLine(out, [start], length);
     out.push(
-      ...rowPoints(segment.row, start.x, end.x, start.y, length).slice(1),
+      ...rowPoints(segment.row, start.x, end.x, start.y, length, minLength).slice(1),
     );
     exit = end;
     fromA = !fromA;
@@ -227,14 +231,19 @@ function stitchSection(
   return exit;
 }
 
-function appendLine(out: Point2[], points: Point2[], maxLength: number): void {
+function appendLine(
+  out: Point2[],
+  points: Point2[],
+  maxLength: number,
+  minLength = 0,
+): void {
   if (out.length === 0) {
     out.push(points[0]);
     points = points.slice(1);
   }
   if (points.length === 0) return;
   out.push(
-    ...resample([out[out.length - 1], ...points], false, maxLength).slice(1),
+    ...resample([out[out.length - 1], ...points], false, maxLength, minLength).slice(1),
   );
 }
 
@@ -243,8 +252,9 @@ export function tatami(
   region: Ring[],
   travelLength: number,
   from: Point2 | null = null,
-  { angle, spacing, stitchLength }: Rows,
+  rows: Rows,
 ): Stitch[] {
+  const { angle, spacing } = rows;
   const cos = Math.cos((angle * Math.PI) / 180);
   const sin = Math.sin((angle * Math.PI) / 180);
   const toRowSpace = (p: Point2): Point2 => ({
@@ -306,7 +316,7 @@ export function tatami(
         const route: Point2[] = [];
         for (let node = entry.id; node !== -1; node = previous[node])
           route.unshift(nodes[node]);
-        appendLine(out, route, travelLength);
+        appendLine(out, route, travelLength, rows.minLength);
       } else {
         [section, entry] = nearestEntry(current, remaining);
         emit([entry], EmbConstant.JUMP);
@@ -315,7 +325,7 @@ export function tatami(
         alreadyStitched = 0;
       }
     }
-    current = stitchSection(section, entry, out, stitchLength);
+    current = stitchSection(section, entry, out, rows);
     remaining.delete(section);
     emit(out.slice(alreadyStitched), EmbConstant.STITCH);
   }
@@ -343,6 +353,7 @@ export function fillStitches(
     angle: rowAngle(options.fillAngle),
     spacing: options.rowSpacing * UNITS_PER_MM,
     stitchLength: options.fillStitchLength * UNITS_PER_MM,
+    minLength: options.minStitchLength * UNITS_PER_MM,
   };
   const underlay = options.underlay
     ? tatami(
@@ -353,6 +364,7 @@ export function fillStitches(
           angle: rowAngle(options.fillAngle + 90),
           spacing: UNDERLAY_SPACING,
           stitchLength: UNDERLAY_STITCH,
+          minLength: options.minStitchLength * UNITS_PER_MM,
         },
       )
     : [];

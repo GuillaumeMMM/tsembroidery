@@ -85,6 +85,7 @@ const { pattern } = readSvg(svgText, { DOMParser: new Window().DOMParser });
 | `fit`                 | `true`  | Shrink and move the stitches if needed so the design stays inside the `size` square (pull compensation, strokes on the edge and content outside the viewBox can overflow it).                        |
 | `underlay`            | `true`  | Stitch a holding layer under fills and satin first.                                                                                                                                                  |
 | `tieStitches`         | `0`     | Small back-and-forth stitches added wherever the thread is cut (start, end, both sides of jumps and color changes) so it holds. `2` or more locks the start too.                                     |
+| `minStitchLength`     | `0`     | Shortest stitch along lines, travel and inside fill rows, in mm (about `0.3` avoids thread breaks). Closer needle points merge into the next stitch; line and row ends stay exact, satin is untouched.|
 | `colorTolerance`      | `10`    | Colors closer than this (0–765) share one thread. `0` keeps every distinct color.                                                                                                                    |
 | `flattenTolerance`    | `0.05`  | Maximum error when curves are turned into lines, in mm.                                                                                                                                              |
 

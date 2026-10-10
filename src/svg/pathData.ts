@@ -121,10 +121,29 @@ export function flattenSvgPath(
   return subpaths;
 }
 
+/**
+ * Drops needle points closer than `minLength` to the previous one, so the short step merges into
+ * the next stitch. The first and last points stay, as the line's exact ends.
+ */
+function dropShortSteps(points: Point2[], minLength: number): Point2[] {
+  if (minLength <= 0 || points.length < 3) return points;
+  const kept = [points[0]];
+  for (let index = 1; index < points.length - 1; index += 1) {
+    if (distance(kept[kept.length - 1], points[index]) >= minLength) kept.push(points[index]);
+  }
+  kept.push(points[points.length - 1]);
+  return kept;
+}
+
+/**
+ * Needle points along a line: each segment split into equal stitches up to `stitchLength`, corners
+ * and curve points kept unless closer than `minLength` to the previous needle point.
+ */
 export function resample(
   points: Point2[],
   closed: boolean,
   stitchLength: number,
+  minLength = 0,
 ): Point2[] {
   const output: Point2[] = [points[0]];
   const segments = closed ? [...points, points[0]] : points;
@@ -146,7 +165,7 @@ export function resample(
       });
     }
   }
-  return output;
+  return dropShortSteps(output, minLength);
 }
 
 function unit(x: number, y: number): Point2 {
@@ -233,6 +252,7 @@ export function resolveStitchSettings(
     underlay = true,
     fillAngle = 45,
     tieStitches = 0,
+    minStitchLength = 0,
   } = settings;
   const invalid = (message: string) => new RangeError(`Stitch settings: ${message}`);
   if (!Number.isFinite(runningStitchLength) || runningStitchLength <= 0) {
@@ -256,6 +276,9 @@ export function resolveStitchSettings(
   if (!Number.isInteger(tieStitches) || tieStitches < 0) {
     throw invalid("tieStitches must be a non-negative integer");
   }
+  if (!Number.isFinite(minStitchLength) || minStitchLength < 0) {
+    throw invalid("minimum stitch length must be a non-negative number");
+  }
   return {
     runningStitchLength,
     fillStitchLength,
@@ -264,6 +287,7 @@ export function resolveStitchSettings(
     underlay,
     fillAngle,
     tieStitches,
+    minStitchLength,
   };
 }
 
@@ -291,6 +315,7 @@ export function strokePoints(
     line.points,
     line.closed,
     options.runningStitchLength * UNITS_PER_MM,
+    options.minStitchLength * UNITS_PER_MM,
   );
   if (width < SATIN_MIN_WIDTH) return run;
   width += 2 * options.pullCompensation * UNITS_PER_MM;

@@ -48,6 +48,7 @@ test("resolveStitchSettings fills in readSvg's defaults and checks values", () =
     underlay: true,
     fillAngle: 45,
     tieStitches: 0,
+    minStitchLength: 0,
   });
   expect(resolveStitchSettings({ fillAngle: 225, underlay: false }).fillAngle).toBe(225);
   expect(() => resolveStitchSettings({ rowSpacing: 0 })).toThrow(/row spacing/);
@@ -254,4 +255,53 @@ test("stitchOutline covers every stitch of a real design", () => {
       expect(rings.some((island) => inside(island, x, y))).toBe(true);
     }
   }
+});
+
+const steps = (stitches: Stitch[]) =>
+  needle(stitches)
+    .slice(1)
+    .map((stitch, i) => Math.hypot(stitch[0] - needle(stitches)[i][0], stitch[1] - needle(stitches)[i][1]));
+
+test("minStitchLength merges short steps along lines, keeping their exact ends", () => {
+  // A finely flattened curve: every point is kept today, so steps are tiny.
+  const points = Array.from({ length: 41 }, (_, i) => ({ x: 100 * Math.cos(i / 40), y: 100 * Math.sin(i / 40) }));
+  const zone: StitchZone = [{ kind: "running", points, closed: false }];
+  const plain = stitchZone(zone);
+  const merged = stitchZone(zone, { minStitchLength: 0.6 });
+  expect(Math.min(...steps(plain))).toBeLessThan(3);
+  expect(Math.min(...steps(merged).slice(0, -1))).toBeGreaterThanOrEqual(6 - 1e-9);
+  expect(merged[0]).toStrictEqual(plain[0]);
+  expect(merged[merged.length - 1]).toStrictEqual(plain[plain.length - 1]);
+  // Every kept point is still on the curve.
+  for (const [x, y] of merged) expect(Math.hypot(x, y)).toBeCloseTo(100, 6);
+});
+
+test("minStitchLength keeps fill rows' ends and leaves satin alone", () => {
+  const fill: StitchZone = [{ kind: "fill", rings: [square(0, 0, 200)] }];
+  const settings = { underlay: false, fillAngle: 0 };
+  const ends = (stitches: Stitch[]) => {
+    const points = needle(stitches);
+    return points.filter(([x]) => Math.abs(x) < 1e-6 || Math.abs(x - 200) < 1e-6).map(([x, y]) => `${x},${y}`).sort();
+  };
+  const plain = stitchZone(fill, settings);
+  const merged = stitchZone(fill, { ...settings, minStitchLength: 1 });
+  expect(ends(merged)).toStrictEqual(ends(plain));
+  // Inside a row, no needle point within 1 mm of the previous one.
+  const rowSteps = needle(merged)
+    .slice(1)
+    .map((stitch, i) => [needle(merged)[i], stitch])
+    .filter(([p, q]) => Math.abs(q[1] - p[1]) < 1e-6)
+    .map(([p, q]) => Math.abs(q[0] - p[0]));
+  expect(Math.min(...rowSteps)).toBeGreaterThanOrEqual(10 - 1e-9);
+  // Satin zigzags cross the column, so they never merge.
+  const satin: StitchZone = [{ kind: "satin", points: [{ x: 0, y: 0 }, { x: 40, y: 30 }, { x: 0, y: 60 }], closed: false, width: 12 }];
+  expect(stitchZone(satin, { underlay: false, minStitchLength: 2 })).toStrictEqual(stitchZone(satin, { underlay: false }));
+});
+
+test("minStitchLength is checked, off by default, and recorded by readSvg", () => {
+  expect(() => resolveStitchSettings({ minStitchLength: -0.1 })).toThrow(/minimum stitch length/);
+  const svg = svg100(`<circle cx="50" cy="50" r="20" fill="none" stroke="#000" stroke-width="0.2"/>`);
+  expect(readSvg(svg, { minStitchLength: 0 }).pattern.stitches).toStrictEqual(readSvg(svg).pattern.stitches);
+  const { pattern } = readSvg(svg, { minStitchLength: 0.3 });
+  expect(pattern.threadlist[0].extras.svg!.settings.minStitchLength).toBe(0.3);
 });

@@ -138,6 +138,7 @@ export function stitchSvg(
     underlay: settings.underlay,
     fillAngle: settings.fillAngle,
     tieStitches: settings.tieStitches,
+    minStitchLength: settings.minStitchLength,
   });
   const flattenTolerance = resolveFlattenTolerance(settings.flattenTolerance);
   const normalized = normalizeSvg(decodeSvgInput(input), settings);

@@ -21,6 +21,7 @@ const DEFAULTS: ThreadStitchSettings = {
   underlay: true,
   fillAngle: 45,
   tieStitches: 0,
+  minStitchLength: 0,
 };
 
 const twoReds = svg100(`

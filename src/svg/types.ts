@@ -68,6 +68,7 @@ export interface ThreadStitchSettings {
   underlay: boolean;
   fillAngle: number;
   tieStitches: number;
+  minStitchLength: number;
 }
 
 /** A point in pattern units (0.1 mm). */
@@ -123,6 +124,8 @@ export interface SvgReadSettings {
   fit?: boolean;
   /** Small back-and-forth stitches added wherever the thread is cut (both sides of jumps and color changes), so it holds. Default 0. */
   tieStitches?: number;
+  /** Shortest stitch along lines, travel and inside fill rows, in mm: closer needle points merge into the next stitch. The ends of lines and rows stay exact, and satin is untouched. Default 0 (off). */
+  minStitchLength?: number;
   /** Maximum nesting of `<use>` references. Default 32. */
   maxUseDepth?: number;
   /** Maximum number of expanded `<use>` references. Default 10000. */
