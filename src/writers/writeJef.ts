@@ -1,13 +1,14 @@
 /** Port of pyembroidery's JefWriter. */
-import { ByteWriter } from "./binaryWriter.js";
-import { EmbConstant } from "./constants.js";
-import type { EncoderSettings } from "./encoder.js";
-import { getJefThreadSet } from "./jefThreads.js";
-import { EmbPattern } from "./pattern.js";
-import { pyRound } from "./pyMath.js";
-import type { EmbThread } from "./thread.js";
+import { ByteWriter } from "../binaryWriter.js";
+import { EmbConstant } from "../constants.js";
+import type { EncoderSettings } from "../encoder.js";
+import { getJefThreadSet } from "../palettes/jefThreads.js";
+import { EmbPattern } from "../pattern.js";
+import { pyRound } from "../utils.js";
+import type { EmbThread } from "../thread.js";
 
-const { COMMAND_MASK, STITCH, JUMP, TRIM, STOP, END, COLOR_CHANGE } = EmbConstant;
+const { COMMAND_MASK, STITCH, JUMP, TRIM, STOP, END, COLOR_CHANGE } =
+  EmbConstant;
 
 const MAX_DELTA = 127;
 
@@ -98,8 +99,17 @@ function writeHoopEdges(out: ByteWriter, x: number, y: number): void {
 }
 
 /** Serializes a pattern as a Janome .jef file. Thread colors become the nearest Janome threads. */
-export function writeJef(source: EmbPattern, settings: JefWriteSettings = {}): Uint8Array {
-  const { encode = true, trims = false, trimAt = 3, date = now(), ...encoderSettings } = settings;
+export function writeJef(
+  source: EmbPattern,
+  settings: JefWriteSettings = {},
+): Uint8Array {
+  const {
+    encode = true,
+    trims = false,
+    trimAt = 3,
+    date = now(),
+    ...encoderSettings
+  } = settings;
   const pattern = encode
     ? source.getNormalizedPattern({
         max_jump: MAX_DELTA,
@@ -126,21 +136,25 @@ export function writeJef(source: EmbPattern, settings: JefWriteSettings = {}): U
   for (const stitch of pattern.stitches) {
     const command = stitch[2] & COMMAND_MASK;
     if (command === STITCH) pointCount += 1;
-    else if (command === JUMP || command === COLOR_CHANGE || command === STOP) pointCount += 2;
+    else if (command === JUMP || command === COLOR_CHANGE || command === STOP)
+      pointCount += 2;
     else if (command === TRIM && trims) pointCount += 2 * trimAt;
     else if (command === END) break;
   }
   out.writeUint32le(pointCount);
 
   const { minX, minY, maxX, maxY } =
-    pattern.stitches.length > 0 ? pattern.extents() : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    pattern.stitches.length > 0
+      ? pattern.extents()
+      : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   const width = pyRound(maxX - minX);
   const height = pyRound(maxY - minY);
   out.writeUint32le(hoopSize(width, height));
   const halfWidth = pyRound(width / 2);
   const halfHeight = pyRound(height / 2);
   // Distance from the hoop center, then from the edges of the 110×110, 50×50 and 140×200 hoops (twice).
-  for (const value of [halfWidth, halfHeight, halfWidth, halfHeight]) out.writeUint32le(value);
+  for (const value of [halfWidth, halfHeight, halfWidth, halfHeight])
+    out.writeUint32le(value);
   writeHoopEdges(out, 550 - halfWidth, 550 - halfHeight);
   writeHoopEdges(out, 250 - halfWidth, 250 - halfHeight);
   writeHoopEdges(out, 700 - halfWidth, 1000 - halfHeight);
@@ -150,7 +164,9 @@ export function writeJef(source: EmbPattern, settings: JefWriteSettings = {}): U
 
   const delta = (dx: number, dy: number) => {
     if (Math.abs(dx) > MAX_DELTA || Math.abs(dy) > MAX_DELTA) {
-      throw new RangeError(`writeJef: a move exceeds the JEF limit of ${MAX_DELTA}`);
+      throw new RangeError(
+        `writeJef: a move exceeds the JEF limit of ${MAX_DELTA}`,
+      );
     }
     out.writeBytes([dx & 0xff, -dy & 0xff]);
   };
@@ -168,7 +184,9 @@ export function writeJef(source: EmbPattern, settings: JefWriteSettings = {}): U
       out.writeBytes([0x80, 0x01]);
       delta(dx, dy);
     } else if (command === TRIM) {
-      if (trims) for (let i = 0; i < trimAt; i++) out.writeBytes([0x80, 0x02, 0x00, 0x00]);
+      if (trims)
+        for (let i = 0; i < trimAt; i++)
+          out.writeBytes([0x80, 0x02, 0x00, 0x00]);
     } else if (command === JUMP) {
       out.writeBytes([0x80, 0x02]);
       delta(dx, dy);

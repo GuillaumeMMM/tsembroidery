@@ -1,11 +1,21 @@
 /** Port of pyembroidery's DstWriter. */
-import { ByteWriter } from "./binaryWriter.js";
-import { EmbConstant } from "./constants.js";
-import type { EncoderSettings } from "./encoder.js";
-import { EmbPattern } from "./pattern.js";
-import { pyRound } from "./pyMath.js";
+import { ByteWriter } from "../binaryWriter.js";
+import { EmbConstant } from "../constants.js";
+import type { EncoderSettings } from "../encoder.js";
+import { EmbPattern } from "../pattern.js";
+import { pyRound } from "../utils.js";
 
-const { COMMAND_MASK, STITCH, JUMP, TRIM, STOP, END, COLOR_CHANGE, SEQUIN_MODE, SEQUIN_EJECT } = EmbConstant;
+const {
+  COMMAND_MASK,
+  STITCH,
+  JUMP,
+  TRIM,
+  STOP,
+  END,
+  COLOR_CHANGE,
+  SEQUIN_MODE,
+  SEQUIN_EJECT,
+} = EmbConstant;
 
 const HEADER_SIZE = 512;
 /** The longest move one record can hold: 81 + 27 + 9 + 3 + 1. */
@@ -21,8 +31,20 @@ export interface DstWriteSettings extends EncoderSettings {
 // For weights 81, 27, 9, 3 and 1: [byte, bit for +weight, bit for -weight].
 type AxisBits = [number, number, number][];
 const WEIGHTS = [81, 27, 9, 3, 1];
-const X_BITS: AxisBits = [[2, 2, 3], [1, 2, 3], [0, 2, 3], [1, 0, 1], [0, 0, 1]];
-const Y_BITS: AxisBits = [[2, 5, 4], [1, 5, 4], [0, 5, 4], [1, 7, 6], [0, 7, 6]];
+const X_BITS: AxisBits = [
+  [2, 2, 3],
+  [1, 2, 3],
+  [0, 2, 3],
+  [1, 0, 1],
+  [0, 0, 1],
+];
+const Y_BITS: AxisBits = [
+  [2, 5, 4],
+  [1, 5, 4],
+  [0, 5, 4],
+  [1, 7, 6],
+  [0, 7, 6],
+];
 
 /** Writes `value` into the record as balanced ternary. */
 function encodeAxis(value: number, record: number[], bits: AxisBits): void {
@@ -36,7 +58,10 @@ function encodeAxis(value: number, record: number[], bits: AxisBits): void {
       value += weight;
     }
   });
-  if (value !== 0) throw new RangeError(`writeDst: a move exceeds the DST limit of ${MAX_DELTA}`);
+  if (value !== 0)
+    throw new RangeError(
+      `writeDst: a move exceeds the DST limit of ${MAX_DELTA}`,
+    );
 }
 
 function encodeRecord(dx: number, dy: number, command: number): number[] {
@@ -60,13 +85,22 @@ function field(text: string): string {
   return `${text}\r`;
 }
 
-const signed = (value: number) => (value >= 0 ? `+${String(value).padStart(5)}` : `-${String(-value).padStart(5)}`);
+const signed = (value: number) =>
+  value >= 0
+    ? `+${String(value).padStart(5)}`
+    : `-${String(-value).padStart(5)}`;
 
-function writeHeader(out: ByteWriter, pattern: EmbPattern, extended: boolean): void {
+function writeHeader(
+  out: ByteWriter,
+  pattern: EmbPattern,
+  extended: boolean,
+): void {
   const encoder = new TextEncoder();
   const stitches = pattern.stitches;
   const { minX, minY, maxX, maxY } =
-    stitches.length > 0 ? pattern.extents() : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    stitches.length > 0
+      ? pattern.extents()
+      : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   const last = stitches[stitches.length - 1];
   const name = pattern.getMetadata("name");
   const lines = [
@@ -90,7 +124,9 @@ function writeHeader(out: ByteWriter, pattern: EmbPattern, extended: boolean): v
     if (author !== undefined) lines.push(`AU:${author}`);
     if (copyright !== undefined) lines.push(`CP:${copyright}`);
     for (const thread of pattern.threadlist) {
-      lines.push(`TC:${thread.hexColor()},${thread.description ?? ""},${thread.catalog_number ?? ""}`);
+      lines.push(
+        `TC:${thread.hexColor()},${thread.description ?? ""},${thread.catalog_number ?? ""}`,
+      );
     }
   }
   for (const line of lines) {
@@ -104,8 +140,15 @@ function writeHeader(out: ByteWriter, pattern: EmbPattern, extended: boolean): v
 }
 
 /** Serializes a pattern as a Tajima .dst file. DST keeps no thread colors unless `extendedHeader` is set. */
-export function writeDst(source: EmbPattern, settings: DstWriteSettings = {}): Uint8Array {
-  const { encode = true, extendedHeader = false, ...encoderSettings } = settings;
+export function writeDst(
+  source: EmbPattern,
+  settings: DstWriteSettings = {},
+): Uint8Array {
+  const {
+    encode = true,
+    extendedHeader = false,
+    ...encoderSettings
+  } = settings;
   const pattern = encode
     ? source.getNormalizedPattern({
         max_jump: MAX_DELTA,

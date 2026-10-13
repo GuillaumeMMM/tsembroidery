@@ -1,6 +1,5 @@
-import { EmbThread } from "./thread.js";
+import { EmbThread } from "../thread.js";
 
-/** Janome's thread chart, as in pyembroidery. JEF files store indexes into it. */
 const JEF_THREADS: [color: number, description: string, catalog: string][] = [
   [0x000000, "Black", "002"],
   [0xffffff, "White", "001"],
@@ -93,7 +92,13 @@ export class EmbThreadJef extends EmbThread {
   }
 }
 
-/** Janome's JEF thread chart. Index 0 is a placeholder: JEF uses it for stops. Fresh threads on every call. */
+/** Janome's JEF thread chart. Index 0 is for stops. */
 export function getJefThreadSet(): (EmbThreadJef | null)[] {
-  return [null, ...JEF_THREADS.map(([color, description, catalog]) => new EmbThreadJef(color, description, catalog))];
+  return [
+    null,
+    ...JEF_THREADS.map(
+      ([color, description, catalog]) =>
+        new EmbThreadJef(color, description, catalog),
+    ),
+  ];
 }

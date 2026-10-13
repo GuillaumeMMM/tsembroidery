@@ -1,14 +1,19 @@
 import { SVGShapes, type SVGPathData } from "svg-pathdata";
 import { colorDistanceRedMean, EmbThread } from "../thread.js";
-import { getTranslate, type Matrix } from "../matrix.js";
 import {
   composeSvgMatrix,
+  getTranslate,
   invertMatrix,
   parseSvgTransform,
   svgMatrix,
+  type Matrix,
 } from "./transform.js";
-import { normalizeSvgViewport } from "./viewport.js";
-import { parseSvgLength, scanNumbers, UNITS_PER_MM } from "./numbers.js";
+import {
+  parseNumberList,
+  parseSvgLength,
+  getNumbers,
+  UNITS_PER_MM,
+} from "./numbers.js";
 import { parseStylesheet } from "./css.js";
 import { flattenSvgPath } from "./pathData.js";
 import {
@@ -17,8 +22,6 @@ import {
   getDefaultSvgStyle,
   getFillStyle,
   getStrokeStyle,
-  parseSvgColor,
-  type StyleContext,
   type SvgStyleState,
 } from "./styles.js";
 import type {
@@ -42,7 +45,7 @@ const SHAPE_TAGS = new Set([
   "circle",
   "ellipse",
 ]);
-const CONTAINER_TAGS = new Set(["g", "svg", "a", "symbol"]);
+const CONTAINER_TAGS = new Set(["g", "svg", "a"]);
 const IGNORED_TAGS = new Set([
   "defs",
   "style",
@@ -55,7 +58,6 @@ const IGNORED_TAGS = new Set([
   "radialgradient",
   "clippath",
 ]);
-const GRADIENT_TAGS = new Set(["lineargradient", "radialgradient"]);
 
 function localName(element: Element): string {
   return (
@@ -86,7 +88,7 @@ function parseDocument(
   if (Parser === undefined) {
     throw new Error("readSvg: no DOMParser here; pass one in the settings");
   }
-  // Not every DOM implementation parses CDATA (happy-dom doesn't), so inline it as escaped text.
+
   const text = source.replace(
     /<!\[CDATA\[([\s\S]*?)\]\]>/g,
     (_, content: string) =>
@@ -114,6 +116,7 @@ function parseDocument(
   return document;
 }
 
+//  Use SVGShapes to generate paths from shapes
 function shapePath(element: Element, tag: string): SVGPathData | string | null {
   switch (tag) {
     case "path":
@@ -127,7 +130,7 @@ function shapePath(element: Element, tag: string): SVGPathData | string | null {
       ]);
     case "polyline":
     case "polygon": {
-      const coords = scanNumbers(element.getAttribute("points") ?? "");
+      const coords = getNumbers(element.getAttribute("points") ?? "");
       if (coords.length < 4) return null;
       coords.length -= coords.length % 2;
       return tag === "polygon"
@@ -167,12 +170,13 @@ function shapePath(element: Element, tag: string): SVGPathData | string | null {
   }
 }
 
-// Only core DOM calls from here on, so minimal DOMs (xmldom in a worker) work too.
 function childElements(element: Element): Element[] {
-  return Array.from(element.childNodes).filter((node): node is Element => node.nodeType === 1);
+  return Array.from(element.childNodes).filter(
+    (node): node is Element => node.nodeType === 1,
+  );
 }
 
-function collectIds(root: Element): Map<string, Element> {
+function getElementsMap(root: Element): Map<string, Element> {
   const ids = new Map<string, Element>();
   for (const element of [root, ...Array.from(root.getElementsByTagName("*"))]) {
     const id = element.getAttribute("id");
@@ -210,11 +214,11 @@ function averageColor(threads: EmbThread[]): EmbThread | null {
   return thread;
 }
 
-function useHref(element: Element): string | null {
+function getHref(element: Element): string | null {
   return (
-    element.getAttribute("href")?.trim() ||
-    element.getAttribute("xlink:href")?.trim() ||
-    element.getAttributeNS(XLINK_NAMESPACE, "href")?.trim() ||
+    element.getAttribute("href") ||
+    element.getAttribute("xlink:href") ||
+    element.getAttributeNS(XLINK_NAMESPACE, "href") ||
     null
   );
 }
@@ -225,77 +229,23 @@ function collectShapes(
   settings: SvgReadSettings,
 ): { shapes: SvgShape[]; warnings: string[] } {
   const root = document.documentElement;
-  const ids = collectIds(root);
+  const elementsMap = getElementsMap(root);
   const shapes: SvgShape[] = [];
   const warnings: string[] = [];
-  const warn = (message: string) => warnings.push(message);
   const maxDepth = settings.maxUseDepth ?? 32;
   const maxInstances = settings.maxUseInstances ?? 10000;
-  if (!Number.isInteger(maxDepth) || maxDepth < 0) {
-    throw new RangeError("SVG maxUseDepth must be a non-negative integer");
-  }
-  if (!Number.isInteger(maxInstances) || maxInstances < 0) {
-    throw new RangeError("SVG maxUseInstances must be a non-negative integer");
-  }
   const tolerance = settings.colorTolerance ?? 10;
-  if (!Number.isFinite(tolerance) || tolerance < 0) {
-    throw new RangeError("SVG colorTolerance must be a non-negative number");
-  }
+
   let instances = 0;
 
   const styleSheet = Array.from(root.getElementsByTagName("style"))
     .map((element) => element.textContent ?? "")
     .join("\n");
-  const rules = parseStylesheet(styleSheet, warn);
+  const cssRules = parseStylesheet(styleSheet, warnings);
 
-  const gradients = new Map<string, EmbThread | null>();
-  const gradientColor = (
-    id: string,
-    seen = new Set<string>(),
-  ): EmbThread | null => {
-    if (gradients.has(id)) return gradients.get(id)!;
-    const element = ids.get(id);
-    if (
-      element === undefined ||
-      !GRADIENT_TAGS.has(localName(element)) ||
-      seen.has(id)
-    ) {
-      warn(`Unsupported paint url(#${id})`);
-      gradients.set(id, null);
-      return null;
-    }
-    const stops = childElements(element).filter(
-      (child) => localName(child) === "stop",
-    );
-    let color: EmbThread | null;
-    if (stops.length > 0) {
-      color = averageColor(
-        stops
-          .map(
-            (stop) =>
-              declaredValue(stop, "stop", rules, "stop-color") ?? "black",
-          )
-          .map(parseSvgColor)
-          .filter((thread) => thread !== null),
-      );
-    } else {
-      // Stops can be inherited from another gradient through href.
-      const href = useHref(element);
-      color = href?.startsWith("#")
-        ? gradientColor(href.slice(1), seen.add(id))
-        : null;
-    }
-    gradients.set(id, color);
-    return color;
-  };
-  const context: StyleContext = {
-    rules,
-    resolvePaint: (id) => gradientColor(id),
-  };
-
-  // Near-identical colors share one thread, so they don't cost a thread change.
   const threads: EmbThread[] = [];
-  const canonicalThread = (thread: EmbThread): EmbThread => {
+
+  const getFirstClosestThread = (thread: EmbThread): EmbThread => {
     const match = threads.find(
       (known) => colorDistance(known, thread) <= tolerance,
     );
@@ -306,24 +256,28 @@ function collectShapes(
 
   const clipReference = (value: string | null): Element | null => {
     if (value === null || value.toLowerCase() === "none") return null;
+
     const id = value.match(/^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)$/)?.[1];
-    const element = id === undefined ? undefined : ids.get(id);
+    const element = id === undefined ? undefined : elementsMap.get(id);
     if (element === undefined || localName(element) !== "clippath") {
-      warn(`Unsupported clip-path ${value}`);
+      warnings.push(`Unsupported clip-path ${value}`);
       return null;
     }
     return element;
   };
 
-  /** The element's clipPath, followed by any clip-path set on that clipPath, and so on. */
   const clipChain = (element: Element, tag: string): Element[] => {
     const chain: Element[] = [];
     for (
-      let clip = clipReference(declaredValue(element, tag, rules, "clip-path"));
+      let clip = clipReference(
+        declaredValue(element, tag, cssRules, "clip-path"),
+      );
       clip !== null && !chain.includes(clip);
     ) {
       chain.push(clip);
-      clip = clipReference(declaredValue(clip, "clippath", rules, "clip-path"));
+      clip = clipReference(
+        declaredValue(clip, "clippath", cssRules, "clip-path"),
+      );
     }
     return chain;
   };
@@ -358,17 +312,17 @@ function collectShapes(
       base,
       parseSvgTransform(clip.getAttribute("transform")),
     );
-    const defaultRule = declaredValue(clip, "clippath", rules, "clip-rule");
+    const defaultRule = declaredValue(clip, "clippath", cssRules, "clip-rule");
     const parts: SvgClipPart[] = [];
     const add = (child: Element, parent: Matrix, depth: number): void => {
       const tag = localName(child);
-      if (declaredValue(child, tag, rules, "display") === "none") return;
+      if (declaredValue(child, tag, cssRules, "display") === "none") return;
       const transform = composeSvgMatrix(
         parent,
         parseSvgTransform(child.getAttribute("transform")),
       );
       if (tag === "use") {
-        const target = ids.get(useHref(child)?.slice(1) ?? "");
+        const target = elementsMap.get(getHref(child)?.slice(1) ?? "");
         if (target !== undefined && depth < maxDepth) {
           add(
             target,
@@ -382,12 +336,13 @@ function collectShapes(
         return;
       }
       if (!SHAPE_TAGS.has(tag)) {
-        warn(`Skipped unsupported <${tag}> in clipPath`);
+        warnings.push(`Skipped unsupported <${tag}> in clipPath`);
         return;
       }
       const path = shapePath(child, tag);
       if (path === null) return;
-      const rule = declaredValue(child, tag, rules, "clip-rule") ?? defaultRule;
+      const rule =
+        declaredValue(child, tag, cssRules, "clip-rule") ?? defaultRule;
       parts.push({
         d: typeof path === "string" ? path : path.encode(),
         transform,
@@ -398,42 +353,34 @@ function collectShapes(
     return parts;
   };
 
-  const visit = (
+  const visitNode = (
     element: Element,
     parentTransform: Matrix,
     inheritedStyle: SvgStyleState,
     inheritedClips: SvgClipPart[][],
     useDepth: number,
     visiting: Set<Element>,
-    allowSymbol = false,
   ): void => {
     if (!isSvgElement(element)) {
       warnings.push(`Skipped non-SVG element <${localName(element)}>`);
       return;
     }
     const tag = localName(element);
-    const style = applySvgStyle(element, tag, inheritedStyle, context);
+    const style = applySvgStyle(element, tag, inheritedStyle, cssRules);
+
     if (!style.display || !style.visibility || style.opacity <= 0) return;
+
     const transform = composeSvgMatrix(
       parentTransform,
       parseSvgTransform(element.getAttribute("transform")),
     );
-    // Clip parts are filled in once the element's shapes exist (bounding-box units need them).
-    const chain = IGNORED_TAGS.has(tag) ? [] : clipChain(element, tag);
-    const ownClips = chain.map((): SvgClipPart[] => []);
+
+    const clipChainArr = IGNORED_TAGS.has(tag) ? [] : clipChain(element, tag);
+    const ownClips = clipChainArr.map((): SvgClipPart[] => []);
     const clips = [...inheritedClips, ...ownClips];
     const start = shapes.length;
-    render(
-      element,
-      tag,
-      style,
-      transform,
-      clips,
-      useDepth,
-      visiting,
-      allowSymbol,
-    );
-    chain.forEach((clip, index) =>
+    render(element, tag, style, transform, clips, useDepth, visiting);
+    clipChainArr.forEach((clip, index) =>
       ownClips[index].push(...clipParts(clip, transform, shapes.slice(start))),
     );
   };
@@ -446,19 +393,20 @@ function collectShapes(
     clips: SvgClipPart[][],
     useDepth: number,
     visiting: Set<Element>,
-    allowSymbol: boolean,
   ): void => {
+    if (IGNORED_TAGS.has(tag) || tag === "symbol") return;
+
     if (tag === "use") {
       if (useDepth >= maxDepth) {
         warnings.push(`Skipped <use> beyond maximum depth ${maxDepth}`);
         return;
       }
-      const href = useHref(element);
+      const href = getHref(element);
       if (href === null || !href.startsWith("#") || href.length === 1) {
         warnings.push("Skipped external or empty <use> reference");
         return;
       }
-      const target = ids.get(href.slice(1));
+      const target = elementsMap.get(href.slice(1));
       if (target === undefined) {
         warnings.push(`Skipped missing <use> target ${href}`);
         return;
@@ -474,7 +422,9 @@ function collectShapes(
         );
         return;
       }
-      visit(
+
+      //  Visit the node referneced by the use
+      visitNode(
         target,
         composeSvgMatrix(
           transform,
@@ -484,43 +434,52 @@ function collectShapes(
         clips,
         useDepth + 1,
         new Set(visiting).add(target),
-        true,
       );
       return;
     }
 
-    if (IGNORED_TAGS.has(tag) || (tag === "symbol" && !allowSymbol)) return;
     if (CONTAINER_TAGS.has(tag)) {
       for (const child of childElements(element)) {
-        visit(child, transform, style, clips, useDepth, visiting, allowSymbol);
+        visitNode(child, transform, style, clips, useDepth, visiting);
       }
       return;
     }
+
+    //  Not a container, not a use, not a shape -> skip
     if (!SHAPE_TAGS.has(tag)) {
       warnings.push(`Skipped unsupported SVG element <${tag}>`);
       return;
     }
 
     const path = shapePath(element, tag);
+
     if (path === null) return;
+
     const d = typeof path === "string" ? path : path.encode();
     const stroke = getStrokeStyle(style);
     const outline =
       stroke === null
         ? null
-        : { d, style: { ...stroke, color: canonicalThread(stroke.color) } };
+        : {
+            d,
+            style: { ...stroke, color: getFirstClosestThread(stroke.color) },
+          };
     const fillStyle = getFillStyle(style);
     const fill =
       fillStyle.color === null
         ? null
         : {
             d,
-            style: { ...fillStyle, color: canonicalThread(fillStyle.color) },
+            style: {
+              ...fillStyle,
+              color: getFirstClosestThread(fillStyle.color),
+            },
           };
     shapes.push({ outline, fill, transform, sourceElement: tag, clips });
   };
 
-  visit(root, viewport.transform, getDefaultSvgStyle(), [], 0, new Set());
+  //  Go through the dom recursively
+  visitNode(root, viewport.transform, getDefaultSvgStyle(), [], 0, new Set());
   return { shapes, warnings };
 }
 
@@ -542,4 +501,85 @@ export function normalizeSvg(
       "xMidYMid meet",
   );
   return { viewport, ...collectShapes(document, viewport, settings) };
+}
+
+const ALIGNMENT: Record<string, number> = { Min: 0, Mid: 0.5, Max: 1 };
+
+function viewportMatrix(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  targetSize: number,
+  preserveAspectRatio: string,
+): Matrix {
+  const [align, meetOrSlice] = preserveAspectRatio.trim().split(/\s+/);
+  const scaleX = targetSize / width;
+  const scaleY = targetSize / height;
+  if (align === "none") {
+    return svgMatrix(scaleX, 0, 0, scaleY, -x * scaleX, -y * scaleY);
+  }
+
+  // Invalid values fall back to xMidYMid.
+  const [, alignX = "Mid", alignY = "Mid"] =
+    align.match(/^x(Min|Mid|Max)Y(Min|Mid|Max)$/) ?? [];
+  const scale =
+    meetOrSlice === "slice"
+      ? Math.max(scaleX, scaleY)
+      : Math.min(scaleX, scaleY);
+  return svgMatrix(
+    scale,
+    0,
+    0,
+    scale,
+    (targetSize - width * scale) * ALIGNMENT[alignX] - x * scale,
+    (targetSize - height * scale) * ALIGNMENT[alignY] - y * scale,
+  );
+}
+
+function normalizeSvgViewport(
+  root: Element,
+  targetSize = 1000,
+  preserveAspectRatio = "xMidYMid meet",
+): SvgViewport {
+  if (targetSize <= 0) {
+    throw new RangeError("SVG size must be a positive number");
+  }
+
+  const viewBox = root.getAttribute("viewBox");
+  let x = 0;
+  let y = 0;
+  let width: number;
+  let height: number;
+  if (viewBox !== null) {
+    const values = parseNumberList(viewBox, "viewBox");
+    if (values.length !== 4) {
+      throw new Error("SVG viewBox requires four numbers");
+    }
+    [x, y, width, height] = values;
+  } else {
+    width = parseSvgLength(root.getAttribute("width")) ?? 300;
+    height = parseSvgLength(root.getAttribute("height")) ?? 150;
+  }
+
+  if (width <= 0 || height <= 0) {
+    throw new Error("SVG viewport must have positive dimensions");
+  }
+
+  return {
+    sourceX: x,
+    sourceY: y,
+    sourceWidth: width,
+    sourceHeight: height,
+    targetSize,
+    preserveAspectRatio,
+    transform: viewportMatrix(
+      x,
+      y,
+      width,
+      height,
+      targetSize,
+      preserveAspectRatio,
+    ),
+  };
 }

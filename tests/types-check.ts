@@ -60,7 +60,7 @@ pattern.addThread(thread);
 pattern.stitchAbs(0, 0);
 pattern.stitch(100, 70);
 
-const encoderSettings: EncoderSettings = { max_stitch: 100, tie_on: true, translate: [10, 10] };
+const encoderSettings: EncoderSettings = { max_stitch: 100, tie_on: true };
 const normalized: EmbPattern = pattern.getNormalizedPattern(encoderSettings);
 const pesSettings: PesWriteSettings = { version: 1, encode: true, max_jump: 2047 };
 const pes: Uint8Array = writePes(pattern, pesSettings);
@@ -79,9 +79,9 @@ const others: EmbPattern[] = [
   readXxx(writeXxx(pattern, xxxSettings)),
 ];
 
-const svgWriteSettings: SvgWriteSettings = { stable: false };
+const svgWriteSettings: SvgWriteSettings = { encode: true };
 const svg: string = writeSvg(normalized, svgWriteSettings);
-const preview: string = writeSvg(readPes(pes), { stable: true });
+const preview: string = writeSvg(readPes(pes));
 
 const input: SvgInput = new TextEncoder().encode("<svg></svg>");
 const readSettings: SvgReadSettings = {

@@ -27,17 +27,21 @@ export function parseNumberList(value: string, context: string): number[] {
   });
 }
 
-export function scanNumbers(value: string): number[] {
+export function getNumbers(value: string): number[] {
   return (value.match(new RegExp(NUMBER, "g")) ?? [])
     .map(Number)
     .filter(Number.isFinite);
 }
 
 /** Absolute lengths only; `%` and unknown units give null. */
-export function parseSvgLength(value: string | null | undefined): number | null {
+export function parseSvgLength(
+  value: string | null | undefined,
+): number | null {
   const match = value?.trim().match(LENGTH);
   if (!match) return null;
   const number = Number(match[1]);
   const factor = SVG_UNITS_TO_PX[(match[2] || "px").toLowerCase()];
-  return Number.isFinite(number) && factor !== undefined ? number * factor : null;
+  return Number.isFinite(number) && factor !== undefined
+    ? number * factor
+    : null;
 }

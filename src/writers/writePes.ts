@@ -1,11 +1,11 @@
-import { EmbConstant } from "./constants.js";
-import { findNearestColorIndex } from "./thread.js";
-import type { EmbThread } from "./thread.js";
-import { EmbPattern } from "./pattern.js";
-import type { Extents, Stitch } from "./pattern.js";
-import { getThreadSet } from "./pecThreads.js";
-import type { EncoderSettings } from "./encoder.js";
-import { ByteWriter } from "./binaryWriter.js";
+import { EmbConstant } from "../constants.js";
+import { findNearestColorIndex } from "../thread.js";
+import type { EmbThread } from "../thread.js";
+import { EmbPattern } from "../pattern.js";
+import type { Extents, Stitch } from "../pattern.js";
+import { getThreadSet } from "../palettes/pecThreads.js";
+import type { EncoderSettings } from "../encoder.js";
+import { ByteWriter } from "../binaryWriter.js";
 import { finiteExtents, truncateUtf8, writePec } from "./writePec.js";
 import type { PecColorInfo } from "./writePec.js";
 
@@ -16,8 +16,6 @@ const {
   STOP,
   COLOR_CHANGE,
   COLOR_BREAK,
-  SEW_TO,
-  NEEDLE_AT,
   CONTINGENCY_SEQUIN_JUMP,
 } = EmbConstant;
 
@@ -36,12 +34,14 @@ export interface PesWriteSettings extends EncoderSettings {
 /** Serializes a pattern as a Brother .pes file. */
 export function writePes(
   source: EmbPattern,
-  settings?: PesWriteSettings
+  settings?: PesWriteSettings,
 ): Uint8Array {
   const values: PesWriteSettings = { ...(settings ?? {}) };
   const version = values.version ?? 6;
   if (version !== 1 && version !== 6) {
-    throw new RangeError(`writePes: unsupported PES version ${String(version)}`);
+    throw new RangeError(
+      `writePes: unsupported PES version ${String(version)}`,
+    );
   }
 
   let normalized: EmbPattern;
@@ -70,7 +70,7 @@ export function writePes(
 function clonePattern(source: EmbPattern): EmbPattern {
   const clone = new EmbPattern();
   clone.stitches = source.stitches.map(
-    ([x, y, command]): Stitch => [x, y, command]
+    ([x, y, command]): Stitch => [x, y, command],
   );
   clone.threadlist.push(...source.threadlist);
   Object.assign(clone.extras, source.extras);
@@ -88,11 +88,7 @@ function preparePatternForPes(pattern: EmbPattern): void {
   let threadIndex = 0;
   for (const stitch of pattern.stitches) {
     const command = stitch[2] & COMMAND_MASK;
-    if (
-      command === STITCH ||
-      command === SEW_TO ||
-      command === NEEDLE_AT
-    ) {
+    if (command === STITCH) {
       continue;
     }
     if (command === COLOR_CHANGE || command === COLOR_BREAK) {
@@ -176,14 +172,16 @@ function patchPecOffset(out: ByteWriter, position: number): void {
 function writePesHeaderV6(
   out: ByteWriter,
   pattern: EmbPattern,
-  distinctBlockObjects: number
+  distinctBlockObjects: number,
 ): void {
   out.writeInt16le(1);
   out.writeBytes(encoder.encode("02"));
   for (const key of ["name", "category", "author", "keywords", "comments"]) {
     writePesString8(out, pattern.getMetadata(key));
   }
-  for (const value of [0, 0, 100, 100, 0, 200, 200, 100, 100, 100, 7, 19, 1, 1, 0, 100, 1, 0]) {
+  for (const value of [
+    0, 0, 100, 100, 0, 200, 200, 100, 100, 100, 7, 19, 1, 1, 0, 100, 1, 0,
+  ]) {
     out.writeInt16le(value);
   }
   writePesString8(out, pattern.getMetadata("image_file"));
@@ -236,9 +234,10 @@ function writePesBlocks(
   out: ByteWriter,
   pattern: EmbPattern,
   chart: EmbThread[],
-  extents: Extents
+  extents: Extents,
 ): PesBlockInfo {
-  if (pattern.stitches.length === 0) return { sectionCount: 0, colorLogCount: 0 };
+  if (pattern.stitches.length === 0)
+    return { sectionCount: 0, colorLogCount: 0 };
 
   const centerX = (extents.maxX + extents.minX) / 2;
   const centerY = (extents.maxY + extents.minY) / 2;
@@ -248,7 +247,11 @@ function writePesBlocks(
   const bottom = extents.maxY - centerY;
 
   writePesString16(out, "CEmbOne");
-  const sectionCountPosition = writePesSewSegHeader(out, right - left, bottom - top);
+  const sectionCountPosition = writePesSewSegHeader(
+    out,
+    right - left,
+    bottom - top,
+  );
   out.writeUint16le(0xffff);
   out.writeUint16le(0);
 
@@ -260,7 +263,7 @@ function writePesBlocks(
     left,
     bottom,
     centerX,
-    centerY
+    centerY,
   );
   const end = out.tell();
   out.seek(sectionCountPosition);
@@ -275,12 +278,17 @@ function writePesBlocks(
   };
 }
 
-function writePesSewSegHeader(out: ByteWriter, width: number, height: number): number {
+function writePesSewSegHeader(
+  out: ByteWriter,
+  width: number,
+  height: number,
+): number {
   for (let index = 0; index < 8; index++) out.writeUint16le(0);
 
   const translateX = 350 + 1300 / 2 - width / 2;
   const translateY = 100 + height + 1800 / 2 - height / 2;
-  for (const value of [1, 0, 0, 1, translateX, translateY]) out.writeFloat32le(value);
+  for (const value of [1, 0, 0, 1, translateX, translateY])
+    out.writeFloat32le(value);
   out.writeUint16le(1);
   out.writeUint16le(0);
   out.writeUint16le(0);
@@ -300,7 +308,7 @@ interface SegmentBlock {
 
 function* getAsSegmentBlocks(
   pattern: EmbPattern,
-  chart: EmbThread[]
+  chart: EmbThread[],
 ): Generator<SegmentBlock> {
   let colorIndex = 0;
   let currentThread = pattern.getThreadOrFiller(colorIndex);
@@ -346,7 +354,7 @@ function writePesSewSegSegments(
   left: number,
   bottom: number,
   centerX: number,
-  centerY: number
+  centerY: number,
 ): PesSegmentInfo {
   let section = 0;
   const colorLog: [number, number][] = [];
@@ -387,8 +395,8 @@ function writePesAddendum(out: ByteWriter, colorInfo: PecColorInfo): void {
   out.writeBytes(colorInfo.colorIndexList);
   out.writeBytes(
     new Array<number>(Math.max(0, 128 - colorInfo.colorIndexList.length)).fill(
-      0x20
-    )
+      0x20,
+    ),
   );
   out.writeBytes(new Array<number>(0x90 * colorInfo.rgbList.length).fill(0));
   for (const color of colorInfo.rgbList) out.writeInt24le(color);

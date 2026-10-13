@@ -1,10 +1,10 @@
-import { EmbConstant } from "./constants.js";
-import { findNearestColorIndex } from "./thread.js";
-import type { EmbThread } from "./thread.js";
-import type { EmbPattern, Extents, Stitch } from "./pattern.js";
-import { getThreadSet } from "./pecThreads.js";
-import { pyRound } from "./pyMath.js";
-import { ByteWriter } from "./binaryWriter.js";
+import { EmbConstant } from "../constants.js";
+import { findNearestColorIndex } from "../thread.js";
+import type { EmbThread } from "../thread.js";
+import type { EmbPattern, Extents, Stitch } from "../pattern.js";
+import { getThreadSet } from "../palettes/pecThreads.js";
+import { pyRound } from "../utils.js";
+import { ByteWriter } from "../binaryWriter.js";
 
 const { COMMAND_MASK, STITCH, JUMP, END, COLOR_CHANGE } = EmbConstant;
 
@@ -28,8 +28,8 @@ function fromHex(hex: string): number[] {
 
 const BLANK_GRAPHIC = Uint8Array.from(
   fromHex(
-    "000000000000f0ffffffff0f080000000010040000000020020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040040000000020080000000010f0ffffffff0f000000000000"
-  )
+    "000000000000f0ffffffff0f080000000010040000000020020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040020000000040040000000020080000000010f0ffffffff0f000000000000",
+  ),
 );
 
 export interface PecColorInfo {
@@ -80,7 +80,7 @@ function buildUniquePalette(threadlist: EmbThread[]): number[] {
     const index = findNearestColorIndex(thread, chart);
     if (index < 0) {
       throw new RangeError(
-        `writePes: a PEC palette supports at most ${chart.length} unique threads`
+        `writePes: a PEC palette supports at most ${chart.length} unique threads`,
       );
     }
     assignments.push(index);
@@ -88,7 +88,10 @@ function buildUniquePalette(threadlist: EmbThread[]): number[] {
   }
 
   return threadlist.map(
-    (thread) => assignments[uniqueThreads.findIndex((unique) => sameThreadValue(unique, thread))]
+    (thread) =>
+      assignments[
+        uniqueThreads.findIndex((unique) => sameThreadValue(unique, thread))
+      ],
   );
 }
 
@@ -96,7 +99,9 @@ export function writePec(pattern: EmbPattern, out: ByteWriter): PecColorInfo {
   const extents = finiteExtents(pattern);
   const palette = buildUniquePalette(pattern.threadlist);
   if (palette.length < 1 || palette.length > 255) {
-    throw new RangeError("writePes: PES supports between 1 and 255 color blocks");
+    throw new RangeError(
+      "writePes: PES supports between 1 and 255 color blocks",
+    );
   }
 
   const pecStart = out.tell();
@@ -112,7 +117,9 @@ export function writePec(pattern: EmbPattern, out: ByteWriter): PecColorInfo {
   out.writeBytes(new Array<number>(12).fill(SPACE));
   const colorIndexList = [palette.length - 1, ...palette];
   out.writeBytes(colorIndexList);
-  out.writeBytes(new Array<number>(pecStart + PEC_HEADER_SIZE - out.tell()).fill(SPACE));
+  out.writeBytes(
+    new Array<number>(pecStart + PEC_HEADER_SIZE - out.tell()).fill(SPACE),
+  );
 
   writePecBlock(pattern, out, extents);
   writePecGraphics(pattern, out, extents);
@@ -122,7 +129,11 @@ export function writePec(pattern: EmbPattern, out: ByteWriter): PecColorInfo {
   };
 }
 
-function writePecBlock(pattern: EmbPattern, out: ByteWriter, extents: Extents): void {
+function writePecBlock(
+  pattern: EmbPattern,
+  out: ByteWriter,
+  extents: Extents,
+): void {
   const blockStart = out.tell();
   out.writeBytes([0x00, 0x00]);
   out.writeInt24le(0);
@@ -146,13 +157,18 @@ function checkedDelta(value: number): number {
   const rounded = pyRound(value);
   if (rounded < -2048 || rounded > 2047) {
     throw new RangeError(
-      `writePes: stitch delta ${rounded} exceeds the PEC limit of -2048..2047`
+      `writePes: stitch delta ${rounded} exceeds the PEC limit of -2048..2047`,
     );
   }
   return rounded;
 }
 
-function writeValue(out: ByteWriter, value: number, forceLong = false, flag = 0): void {
+function writeValue(
+  out: ByteWriter,
+  value: number,
+  forceLong = false,
+  flag = 0,
+): void {
   if (!forceLong && value > -64 && value < 63) {
     out.writeUint8(value & 0x7f);
     return;
@@ -162,7 +178,12 @@ function writeValue(out: ByteWriter, value: number, forceLong = false, flag = 0)
   out.writeUint8(encoded & 0xff);
 }
 
-function writeDelta(out: ByteWriter, dx: number, dy: number, flag?: number): void {
+function writeDelta(
+  out: ByteWriter,
+  dx: number,
+  dy: number,
+  flag?: number,
+): void {
   writeValue(out, dx, flag !== undefined, flag);
   writeValue(out, dy, flag !== undefined, flag);
 }
@@ -205,18 +226,28 @@ function encodePecStitches(pattern: EmbPattern, out: ByteWriter): void {
   out.writeUint8(0xff);
 }
 
-function writePecGraphics(pattern: EmbPattern, out: ByteWriter, extents: Extents): void {
+function writePecGraphics(
+  pattern: EmbPattern,
+  out: ByteWriter,
+  extents: Extents,
+): void {
   const allPoints: Stitch[] = [];
   for (const [block] of pattern.getAsStitchblock()) allPoints.push(...block);
   out.writeBytes(drawScaled(extents, allPoints, 4));
 
   for (const [block] of pattern.getAsColorblocks()) {
-    const stitches = block.filter((stitch) => (stitch[2] & COMMAND_MASK) === STITCH);
+    const stitches = block.filter(
+      (stitch) => (stitch[2] & COMMAND_MASK) === STITCH,
+    );
     out.writeBytes(drawScaled(extents, stitches, 5));
   }
 }
 
-function drawScaled(extents: Extents, points: Stitch[], buffer: number): Uint8Array {
+function drawScaled(
+  extents: Extents,
+  points: Stitch[],
+  buffer: number,
+): Uint8Array {
   const graphic = BLANK_GRAPHIC.slice();
   const diagramWidth = extents.maxX - extents.minX || 1;
   const diagramHeight = extents.maxY - extents.minY || 1;
@@ -224,16 +255,18 @@ function drawScaled(extents: Extents, points: Stitch[], buffer: number): Uint8Ar
   const graphicHeight = graphic.length / PEC_STRIDE;
   const scale = Math.min(
     (graphicWidth - buffer) / diagramWidth,
-    (graphicHeight - buffer) / diagramHeight
+    (graphicHeight - buffer) / diagramHeight,
   );
-  const translateX = graphicWidth / 2 - ((extents.maxX + extents.minX) / 2) * scale;
-  const translateY = graphicHeight / 2 - ((extents.maxY + extents.minY) / 2) * scale;
+  const translateX =
+    graphicWidth / 2 - ((extents.maxX + extents.minX) / 2) * scale;
+  const translateY =
+    graphicHeight / 2 - ((extents.maxY + extents.minY) / 2) * scale;
 
   for (const point of points) {
     const x = Math.floor(point[0] * scale + translateX);
     const y = Math.floor(point[1] * scale + translateY);
     if (x < 0 || x >= graphicWidth || y < 0 || y >= graphicHeight) continue;
-    graphic[y * PEC_STRIDE + Math.floor(x / 8)] |= 1 << x % 8;
+    graphic[y * PEC_STRIDE + Math.floor(x / 8)] |= 1 << (x % 8);
   }
   return graphic;
 }

@@ -17,20 +17,29 @@ export function parseDeclarations(text: string): Declaration[] {
     const separator = part.indexOf(":");
     if (separator < 0) continue;
     const property = part.slice(0, separator).trim().toLowerCase();
-    const value = part.slice(separator + 1).replace(/!important\s*$/i, "").trim();
+    const value = part
+      .slice(separator + 1)
+      .replace(/!important\s*$/i, "")
+      .trim();
     if (property && value) declarations.push([property, value]);
   }
   return declarations;
 }
 
-function parseSelector(text: string): Omit<CssRule, "order" | "declarations"> | null {
+function parseSelector(
+  text: string,
+): Omit<CssRule, "order" | "declarations"> | null {
   const match = text.match(SIMPLE_SELECTOR);
   if (!match || text === "") return null;
   const tag = match[1] && match[1] !== "*" ? match[1].toLowerCase() : null;
   const parts = match[2].match(/[.#][\w-]+/g) ?? [];
-  const ids = parts.filter((part) => part.startsWith("#")).map((part) => part.slice(1));
+  const ids = parts
+    .filter((part) => part.startsWith("#"))
+    .map((part) => part.slice(1));
   if (ids.length > 1) return null;
-  const classes = parts.filter((part) => part.startsWith(".")).map((part) => part.slice(1));
+  const classes = parts
+    .filter((part) => part.startsWith("."))
+    .map((part) => part.slice(1));
   return {
     tag,
     id: ids[0] ?? null,
@@ -40,7 +49,7 @@ function parseSelector(text: string): Omit<CssRule, "order" | "declarations"> | 
 }
 
 /** Supports tag, .class and #id selectors (and compounds of them); skips the rest with a warning. */
-export function parseStylesheet(source: string, warn: (message: string) => void): CssRule[] {
+export function parseStylesheet(source: string, warnings: string[]): CssRule[] {
   const text = source.replace(/\/\*[\s\S]*?\*\//g, "");
   const rules: CssRule[] = [];
   let offset = 0;
@@ -60,14 +69,16 @@ export function parseStylesheet(source: string, warn: (message: string) => void)
     offset = close;
 
     if (prelude.startsWith("@")) {
-      warn(`Skipped CSS at-rule ${prelude.split(/\s/)[0]}`);
+      warnings.push(`Skipped CSS at-rule ${prelude.split(/\s/)[0]}`);
       continue;
     }
     const declarations = parseDeclarations(body);
     for (const selectorText of prelude.split(",")) {
       const selector = parseSelector(selectorText.trim());
       if (selector === null) {
-        warn(`Skipped unsupported CSS selector "${selectorText.trim()}"`);
+        warnings.push(
+          `Skipped unsupported CSS selector "${selectorText.trim()}"`,
+        );
         continue;
       }
       rules.push({ ...selector, order: rules.length, declarations });
@@ -77,16 +88,22 @@ export function parseStylesheet(source: string, warn: (message: string) => void)
 }
 
 /** Declarations of the rules matching `element`, lowest priority first. */
-export function matchingDeclarations(element: Element, tag: string, rules: CssRule[]): Declaration[] {
+export function matchingDeclarations(
+  element: Element,
+  tag: string,
+  rules: CssRule[],
+): Declaration[] {
   if (rules.length === 0) return [];
   const id = element.getAttribute("id");
-  const classes = new Set((element.getAttribute("class") ?? "").split(/\s+/).filter(Boolean));
+  const classes = new Set(
+    (element.getAttribute("class") ?? "").split(/\s+/).filter(Boolean),
+  );
   return rules
     .filter(
       (rule) =>
         (rule.tag === null || rule.tag === tag) &&
         (rule.id === null || rule.id === id) &&
-        rule.classes.every((name) => classes.has(name))
+        rule.classes.every((name) => classes.has(name)),
     )
     .sort((a, b) => a.specificity - b.specificity || a.order - b.order)
     .flatMap((rule) => rule.declarations);

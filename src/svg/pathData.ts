@@ -1,5 +1,5 @@
 import { SVGPathData } from "svg-pathdata";
-import type { Matrix } from "../matrix.js";
+import type { Matrix } from "./transform.js";
 import { UNITS_PER_MM } from "./numbers.js";
 import type { SvgShape, ThreadStitchSettings } from "./types.js";
 

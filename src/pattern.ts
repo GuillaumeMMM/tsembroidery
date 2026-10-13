@@ -1,7 +1,7 @@
 /** Port of pyembroidery's EmbPattern. Stitches are absolute [x, y, command], in 0.1 mm. */
 import { EmbConstant, type Command } from "./constants.js";
 import { EmbThread } from "./thread.js";
-import { pyRound } from "./pyMath.js";
+import { pyRound } from "./utils.js";
 import { Transcoder, type EncoderSettings } from "./encoder.js";
 
 /** Value equality: PES v6 reads equal threads as separate objects. */
@@ -22,7 +22,7 @@ export type Stitch = [number, number, Command | number];
 
 export type StitchBlock = [Stitch[], EmbThread];
 
-export interface ThreadSpec {
+export interface Threadthread {
   name?: string;
   description?: string;
   desc?: string;
@@ -44,7 +44,6 @@ export interface Extents {
 
 /**
  * Data apps attach to a pattern, by key; readers also store file metadata here. Add typed keys with
- * module augmentation: `declare module "@guillaumemmm/tsembroidery" { interface PatternExtras { myApp?: MyData } }`.
  */
 export interface PatternExtras {
   [key: string]: unknown;
@@ -98,42 +97,46 @@ export class EmbPattern {
     this.addStitchRelative(EmbConstant.END, dx, dy);
   }
 
-  addThread(thread: EmbThread | number | ThreadSpec): void {
+  addThread(thread: EmbThread | number | Threadthread): void {
     if (thread instanceof EmbThread) {
       this.threadlist.push(thread);
       return;
     }
+
+    const threadObject = new EmbThread();
+
     if (typeof thread === "number") {
-      const threadObject = new EmbThread();
       threadObject.color = thread;
       this.threadlist.push(threadObject);
       return;
     }
-    const spec = thread;
-    const threadObject = new EmbThread();
-    if (spec.name) threadObject.description = spec.name;
-    if (spec.description) threadObject.description = spec.description;
-    if (spec.desc) threadObject.description = spec.desc;
-    if (spec.brand) threadObject.brand = spec.brand;
-    if (spec.manufacturer) threadObject.brand = spec.manufacturer;
-    const color = spec.color !== undefined ? spec.color : spec.rgb;
+
+    if (thread.name) threadObject.description = thread.name;
+    if (thread.description) threadObject.description = thread.description;
+    if (thread.desc) threadObject.description = thread.desc;
+    if (thread.brand) threadObject.brand = thread.brand;
+    if (thread.manufacturer) threadObject.brand = thread.manufacturer;
+
+    const color = thread.color !== undefined ? thread.color : thread.rgb;
+
     if (color !== undefined) {
       if (typeof color === "number") {
         threadObject.color = color;
-      } else if (typeof color === "string") {
-        if (color === "random") {
-          threadObject.color =
-            (0xff000000 | Math.floor(Math.random() * 0x1000000)) >>> 0;
-        }
+      }
+      if (typeof color === "string") {
         if (color[0] === "#") threadObject.setHexColor(color.substring(1));
-      } else if (Array.isArray(color)) {
+      }
+      if (Array.isArray(color)) {
         threadObject.color =
-          ((color[0] & 0xff) << 16) | ((color[1] & 0xff) << 8) | (color[2] & 0xff);
+          ((color[0] & 0xff) << 16) |
+          ((color[1] & 0xff) << 8) |
+          (color[2] & 0xff);
       }
     }
-    if (spec.hex) threadObject.setHexColor(spec.hex);
-    if (spec.id) threadObject.catalog_number = spec.id;
-    if (spec.catalog) threadObject.catalog_number = spec.catalog;
+    if (thread.hex) threadObject.setHexColor(thread.hex);
+    if (thread.id) threadObject.catalog_number = thread.id;
+    if (thread.catalog) threadObject.catalog_number = thread.catalog;
+
     this.threadlist.push(threadObject);
   }
 
@@ -141,10 +144,8 @@ export class EmbPattern {
     this.extras[name] = data;
   }
 
-  getMetadata<T = unknown>(name: string | number, fallback?: T): T | undefined {
-    return this.extras[name] !== undefined
-      ? (this.extras[name] as T)
-      : fallback;
+  getMetadata<T = unknown>(name: string | number): T | undefined {
+    return this.extras[name] as T | undefined;
   }
 
   addStitchAbsolute(cmd: Command | number, x = 0, y = 0): void {
@@ -159,13 +160,16 @@ export class EmbPattern {
     this.addStitchAbsolute(cmd, x, y);
   }
 
-  /** Appends without moving the relative-position cursor. */
   addCommand(cmd: Command | number, x = 0, y = 0): void {
     this.stitches.push([x, y, cmd]);
   }
 
-  /** Inserts a command relative to the stitch before `position`. */
-  insertStitchRelative(position: number, cmd: Command | number, dx = 0, dy = 0): void {
+  insertStitchRelative(
+    position: number,
+    cmd: Command | number,
+    dx = 0,
+    dy = 0,
+  ): void {
     if (position < 0) position += this.stitches.length;
     if (position === 0) {
       this.stitches.unshift([dx, dy, cmd]);
@@ -181,7 +185,10 @@ export class EmbPattern {
     const threadlist = this.threadlist;
     const block = stitchblock[0];
     const thread = stitchblock[1];
-    if (threadlist.length === 0 || thread !== threadlist[threadlist.length - 1]) {
+    if (
+      threadlist.length === 0 ||
+      thread !== threadlist[threadlist.length - 1]
+    ) {
       threadlist.push(thread);
       this.addStitchRelative(EmbConstant.COLOR_BREAK);
     } else {
@@ -206,8 +213,6 @@ export class EmbPattern {
     return { minX, minY, maxX, maxY };
   }
 
-  extends = this.extents;
-
   countStitchCommands(command: Command | number): number {
     let count = 0;
     for (const stitch of this.stitches) {
@@ -228,24 +233,14 @@ export class EmbPattern {
     return this.threadlist.length;
   }
 
-  static getRandomThread(): EmbThread {
-    const thread = new EmbThread();
-    thread.color = (0xff000000 | Math.floor(Math.random() * 0x1000000)) >>> 0;
-    thread.description = "Random";
-    return thread;
-  }
-
-  /** Missing threads get a fresh black filler (pyembroidery uses a random color). */
   getThreadOrFiller(index: number): EmbThread {
-    if (this.threadlist.length <= index) return EmbPattern.getFillerThread();
+    if (this.threadlist.length <= index) {
+      const thread = new EmbThread();
+      thread.setColor(0, 0, 0);
+      thread.description = "Filler";
+      return thread;
+    }
     return this.threadlist[index];
-  }
-
-  private static getFillerThread(): EmbThread {
-    const thread = new EmbThread();
-    thread.setColor(0, 0, 0);
-    thread.description = "Filler";
-    return thread;
   }
 
   *getAsStitchblock(): Generator<StitchBlock> {
@@ -265,7 +260,10 @@ export class EmbPattern {
         }
         // Deviation from pyembroidery, which only follows COLOR_CHANGE: addStitchblock marks colors
         // with COLOR_BREAK. Like the encoder, a COLOR_BREAK before any stitch opens the first thread.
-        if (flags === EmbConstant.COLOR_CHANGE || (flags === EmbConstant.COLOR_BREAK && stitched)) {
+        if (
+          flags === EmbConstant.COLOR_CHANGE ||
+          (flags === EmbConstant.COLOR_BREAK && stitched)
+        ) {
           thread = this.getThreadOrFiller(threadIndex);
           threadIndex += 1;
         }
@@ -321,27 +319,6 @@ export class EmbPattern {
     yield [this.stitches.slice(lastPos), thread];
   }
 
-  getUniqueThreadlist(): EmbThread[] {
-    return [...new Set(this.threadlist)];
-  }
-
-  getSingletonThreadlist(): EmbThread[] {
-    const singleton: EmbThread[] = [];
-    let lastThread: EmbThread | null = null;
-    for (const thread of this.threadlist) {
-      if (thread !== lastThread) singleton.push(thread);
-      lastThread = thread;
-    }
-    return singleton;
-  }
-
-  moveCenterToOrigin(): void {
-    const extents = this.extents();
-    const cx = pyRound((extents.maxX + extents.minX) / 2);
-    const cy = pyRound((extents.maxY + extents.minY) / 2);
-    this.translate(-cx, -cy);
-  }
-
   translate(dx: number, dy: number): void {
     for (const stitch of this.stitches) {
       stitch[0] += dx;
@@ -353,17 +330,16 @@ export class EmbPattern {
     let threadIndex = 0;
     let initColor = true;
     for (const stitch of this.stitches) {
-      const data = stitch[2] & EmbConstant.COMMAND_MASK;
-      if (
-        data === EmbConstant.STITCH ||
-        data === EmbConstant.SEW_TO ||
-        data === EmbConstant.NEEDLE_AT
-      ) {
+      const command = stitch[2] & EmbConstant.COMMAND_MASK;
+      if (command === EmbConstant.STITCH) {
         if (initColor) {
           threadIndex += 1;
           initColor = false;
         }
-      } else if (data === EmbConstant.COLOR_CHANGE || data === EmbConstant.COLOR_BREAK) {
+      } else if (
+        command === EmbConstant.COLOR_CHANGE ||
+        command === EmbConstant.COLOR_BREAK
+      ) {
         initColor = true;
       }
     }
@@ -380,7 +356,7 @@ export class EmbPattern {
   interpolateTrims(
     jumpsToRequireTrim: number | null = null,
     distanceToRequireTrim: number | null = null,
-    clipping = true
+    clipping = true,
   ): void {
     let i = -1;
     let ie = this.stitches.length - 1;
@@ -399,10 +375,16 @@ export class EmbPattern {
       const dy = stitch[1] - y;
       [x, y] = stitch;
       const command = stitch[2] & EmbConstant.COMMAND_MASK;
-      if (command === EmbConstant.STITCH || command === EmbConstant.SEQUIN_EJECT) {
+      if (
+        command === EmbConstant.STITCH ||
+        command === EmbConstant.SEQUIN_EJECT
+      ) {
         trimmed = false;
         jumping = false;
-      } else if (command === EmbConstant.COLOR_CHANGE || command === EmbConstant.TRIM) {
+      } else if (
+        command === EmbConstant.COLOR_CHANGE ||
+        command === EmbConstant.TRIM
+      ) {
         trimmed = true;
         jumping = false;
       }
@@ -418,7 +400,8 @@ export class EmbPattern {
         !trimmed &&
         (jumpCount === jumpsToRequireTrim ||
           (distanceToRequireTrim !== null &&
-            (Math.abs(jumpDy) > distanceToRequireTrim || Math.abs(jumpDx) > distanceToRequireTrim)))
+            (Math.abs(jumpDy) > distanceToRequireTrim ||
+              Math.abs(jumpDx) > distanceToRequireTrim)))
       ) {
         this.insertStitchRelative(jumpStart, EmbConstant.TRIM);
         jumpStart += 1;
@@ -435,44 +418,6 @@ export class EmbPattern {
     }
   }
 
-  convertJumpsToTrim(jumpsToRequireTrim = 3): void {
-    const tempPattern = new EmbPattern();
-    let i = -1;
-    const ie = this.stitches.length - 1;
-    let count = 0;
-    let trimmed = true;
-    while (i < ie) {
-      i += 1;
-      let stitch = this.stitches[i];
-      let command = stitch[2];
-      if (command === EmbConstant.STITCH || command === EmbConstant.SEQUIN_EJECT) {
-        trimmed = false;
-      } else if (command === EmbConstant.COLOR_CHANGE || command === EmbConstant.TRIM) {
-        trimmed = true;
-      }
-      if (trimmed || stitch[2] !== EmbConstant.JUMP) {
-        tempPattern.addStitchAbsolute(stitch[2], stitch[0], stitch[1]);
-        continue;
-      }
-      while (i < ie && command === EmbConstant.JUMP) {
-        i += 1;
-        stitch = this.stitches[i];
-        command = stitch[2];
-        count += 1;
-      }
-      if (command !== EmbConstant.JUMP) {
-        i -= 1;
-      }
-      stitch = this.stitches[i];
-      if (count >= jumpsToRequireTrim) {
-        tempPattern.trim();
-      }
-      count = 0;
-      tempPattern.addStitchAbsolute(stitch[2], stitch[0], stitch[1]);
-    }
-    this.stitches = tempPattern.stitches;
-  }
-
   convertDuplicateColorChangeToStop(): void {
     const newPattern = new EmbPattern();
     newPattern.addThread(this.getThreadOrFiller(0));
@@ -485,8 +430,7 @@ export class EmbPattern {
       ) {
         threadIndex += 1;
         const thread = this.getThreadOrFiller(threadIndex);
-        const last =
-          newPattern.threadlist[newPattern.threadlist.length - 1];
+        const last = newPattern.threadlist[newPattern.threadlist.length - 1];
         if (sameThread(thread, last)) {
           newPattern.stop();
         } else {
@@ -502,82 +446,10 @@ export class EmbPattern {
     this.threadlist = newPattern.threadlist;
   }
 
-  convertStopToColorChange(): void {
-    const newPattern = new EmbPattern();
-    newPattern.addThread(this.getThreadOrFiller(0));
-    let threadIndex = 1;
-
-    for (const [x, y, command] of this.stitches) {
-      if (command === EmbConstant.COLOR_CHANGE || command === EmbConstant.COLOR_BREAK) {
-        newPattern.addThread(this.getThreadOrFiller(threadIndex));
-        newPattern.addStitchAbsolute(command, x, y);
-        threadIndex += 1;
-      } else if (command === EmbConstant.STOP) {
-        newPattern.colorChange();
-        newPattern.addThread(this.getThreadOrFiller(threadIndex));
-      } else {
-        newPattern.addStitchAbsolute(command, x, y);
-      }
-    }
-
-    this.stitches = newPattern.stitches;
-    this.threadlist = newPattern.threadlist;
-  }
-
-  getPatternMergeJumps(): EmbPattern {
-    const newPattern = new EmbPattern();
-    let i = -1;
-    const ie = this.stitches.length - 1;
-    let stitchBreak = false;
-    while (i < ie) {
-      i += 1;
-      const stitch = this.stitches[i];
-      if (stitch[2] === EmbConstant.JUMP) {
-        if (stitchBreak) continue;
-        newPattern.addCommand(EmbConstant.STITCH_BREAK);
-        stitchBreak = true;
-        continue;
-      }
-      newPattern.addStitchAbsolute(stitch[2], stitch[0], stitch[1]);
-    }
-    newPattern.threadlist.push(...this.threadlist);
-    Object.assign(newPattern.extras, this.extras);
-    return newPattern;
-  }
-
-  getStablePattern(): EmbPattern {
-    const stablePattern = new EmbPattern();
-    for (const stitchblock of this.getAsStitchblock()) {
-      stablePattern.addStitchblock(stitchblock);
-    }
-    Object.assign(stablePattern.extras, this.extras);
-    return stablePattern;
-  }
-
   getNormalizedPattern(encodeSettings?: EncoderSettings): EmbPattern {
     const normalPattern = new EmbPattern();
     const transcoder = new Transcoder(encodeSettings);
     transcoder.transcode(this, normalPattern);
     return normalPattern;
-  }
-
-  appendTranslation(x: number, y: number): void {
-    this.addStitchRelative(EmbConstant.MATRIX_TRANSLATE, x, y);
-  }
-
-  appendEnableTieOn(x = 0, y = 0): void {
-    this.addStitchRelative(EmbConstant.OPTION_ENABLE_TIE_ON, x, y);
-  }
-
-  appendEnableTieOff(x = 0, y = 0): void {
-    this.addStitchRelative(EmbConstant.OPTION_ENABLE_TIE_OFF, x, y);
-  }
-
-  appendDisableTieOn(x = 0, y = 0): void {
-    this.addStitchRelative(EmbConstant.OPTION_DISABLE_TIE_ON, x, y);
-  }
-
-  appendDisableTieOff(x = 0, y = 0): void {
-    this.addStitchRelative(EmbConstant.OPTION_DISABLE_TIE_OFF, x, y);
   }
 }

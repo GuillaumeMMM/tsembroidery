@@ -1,11 +1,12 @@
 /** Port of pyembroidery's XxxWriter. */
-import { ByteWriter } from "./binaryWriter.js";
-import { EmbConstant } from "./constants.js";
-import type { EncoderSettings } from "./encoder.js";
-import { EmbPattern } from "./pattern.js";
-import { pyRound } from "./pyMath.js";
+import { ByteWriter } from "../binaryWriter.js";
+import { EmbConstant } from "../constants.js";
+import type { EncoderSettings } from "../encoder.js";
+import { EmbPattern } from "../pattern.js";
+import { pyRound } from "../utils.js";
 
-const { COMMAND_MASK, STITCH, JUMP, TRIM, STOP, END, COLOR_CHANGE } = EmbConstant;
+const { COMMAND_MASK, STITCH, JUMP, TRIM, STOP, END, COLOR_CHANGE } =
+  EmbConstant;
 
 /** 0x7D-0x7F start commands, so short records stop below them. */
 const MAX_DELTA = 124;
@@ -23,14 +24,23 @@ function writeHeader(out: ByteWriter, pattern: EmbPattern): void {
   const stitches = pattern.stitches;
   const last = stitches[stitches.length - 1] ?? [0, 0, END];
   const { minX, minY, maxX, maxY } =
-    stitches.length > 0 ? pattern.extents() : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    stitches.length > 0
+      ? pattern.extents()
+      : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   zeros(out, 0x17);
   // The END command isn't counted.
   out.writeUint32le(stitches.length - 1);
   zeros(out, 0x0c);
   out.writeUint32le(pattern.threadlist.length);
   out.writeUint16le(0);
-  for (const value of [maxX - minX, maxY - minY, last[0], -last[1], -minX, maxY]) {
+  for (const value of [
+    maxX - minX,
+    maxY - minY,
+    last[0],
+    -last[1],
+    -minX,
+    maxY,
+  ]) {
     out.writeUint16le(Math.trunc(value) & 0xffff);
   }
   zeros(out, 0x42 + 4 + 0x73);
@@ -40,7 +50,9 @@ function writeHeader(out: ByteWriter, pattern: EmbPattern): void {
 
 function writeShort(out: ByteWriter, dx: number, dy: number): void {
   if (dx < -128 || dx > 127 || dy < -127 || dy > 128) {
-    throw new RangeError(`writeXxx: a move exceeds the XXX limit of ${MAX_DELTA}`);
+    throw new RangeError(
+      `writeXxx: a move exceeds the XXX limit of ${MAX_DELTA}`,
+    );
   }
   out.writeUint8(dx & 0xff);
   out.writeUint8(-dy & 0xff);
@@ -81,7 +93,12 @@ function writeStitches(out: ByteWriter, pattern: EmbPattern): void {
 function writeColors(out: ByteWriter, pattern: EmbPattern): void {
   out.writeBytes([0x00, 0x00]);
   for (const thread of pattern.threadlist) {
-    out.writeBytes([0x00, thread.getRed(), thread.getGreen(), thread.getBlue()]);
+    out.writeBytes([
+      0x00,
+      thread.getRed(),
+      thread.getGreen(),
+      thread.getBlue(),
+    ]);
   }
   zeros(out, 4 * Math.max(0, 21 - pattern.threadlist.length));
   out.writeUint32le(0xffffff00);
@@ -89,7 +106,10 @@ function writeColors(out: ByteWriter, pattern: EmbPattern): void {
 }
 
 /** Serializes a pattern as a Singer .xxx file. */
-export function writeXxx(source: EmbPattern, settings: XxxWriteSettings = {}): Uint8Array {
+export function writeXxx(
+  source: EmbPattern,
+  settings: XxxWriteSettings = {},
+): Uint8Array {
   const { encode = true, ...encoderSettings } = settings;
   const pattern = encode
     ? source.getNormalizedPattern({

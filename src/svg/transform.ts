@@ -1,12 +1,42 @@
-import {
-  getIdentity,
-  getRotate,
-  getScale,
-  getTranslate,
-  matrixMultiply,
-  type Matrix,
-} from "../matrix.js";
 import { parseNumberList } from "./numbers.js";
+
+/** Row-major 3x3 matrices applied to row vectors, as in pyembroidery. */
+export type Matrix = number[];
+
+export function getIdentity(): Matrix {
+  return [1, 0, 0, 0, 1, 0, 0, 0, 1];
+}
+
+export function getScale(sx: number, sy: number | null = null): Matrix {
+  const y = sy === null ? sx : sy;
+  return [sx, 0, 0, 0, y, 0, 0, 0, 1];
+}
+
+export function getTranslate(tx: number, ty: number): Matrix {
+  return [1, 0, 0, 0, 1, 0, tx, ty, 1];
+}
+
+export function getRotate(theta: number): Matrix {
+  const tau = Math.PI * 2;
+  theta *= tau / 360;
+  const ct = Math.cos(theta);
+  const st = Math.sin(theta);
+  return [ct, st, 0, -st, ct, 0, 0, 0, 1];
+}
+
+export function matrixMultiply(a: Matrix, b: Matrix): Matrix {
+  return [
+    a[0] * b[0] + a[1] * b[3] + a[2] * b[6],
+    a[0] * b[1] + a[1] * b[4] + a[2] * b[7],
+    a[0] * b[2] + a[1] * b[5] + a[2] * b[8],
+    a[3] * b[0] + a[4] * b[3] + a[5] * b[6],
+    a[3] * b[1] + a[4] * b[4] + a[5] * b[7],
+    a[3] * b[2] + a[4] * b[5] + a[5] * b[8],
+    a[6] * b[0] + a[7] * b[3] + a[8] * b[6],
+    a[6] * b[1] + a[7] * b[4] + a[8] * b[7],
+    a[6] * b[2] + a[7] * b[5] + a[8] * b[8],
+  ];
+}
 
 const TRANSFORM = /\s*,?\s*(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/y;
 

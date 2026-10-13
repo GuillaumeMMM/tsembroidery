@@ -1,10 +1,14 @@
 import { colord, extend } from "colord";
 import namesPlugin from "colord/plugins/names";
 import { EmbThread } from "../thread.js";
-import { matchingDeclarations, parseDeclarations, type CssRule, type Declaration } from "./css.js";
+import {
+  matchingDeclarations,
+  parseDeclarations,
+  type CssRule,
+  type Declaration,
+} from "./css.js";
 import { parseSvgLength } from "./numbers.js";
 import type { SvgFillStyle, SvgStrokeStyle } from "./types.js";
-
 
 const PRESENTATION_ATTRIBUTES = [
   "stroke",
@@ -23,14 +27,6 @@ const PRESENTATION_ATTRIBUTES = [
   "visibility",
   "stop-color",
 ];
-
-export interface StyleContext {
-  rules: CssRule[];
-  /** Flat color for a `url(#id)` paint server, or null. */
-  resolvePaint: (id: string) => EmbThread | null;
-}
-
-const NO_STYLES: StyleContext = { rules: [], resolvePaint: () => null };
 
 export interface SvgStyleState {
   stroke: EmbThread | null;
@@ -69,7 +65,9 @@ export function getDefaultSvgStyle(): SvgStyleState {
 /** `none` and fully transparent colors give null. */
 let namesLoaded = false;
 
-export function parseSvgColor(value: string | null | undefined): EmbThread | null {
+export function parseSvgColor(
+  value: string | null | undefined,
+): EmbThread | null {
   if (value === null || value === undefined) return null;
   // Registered on first use so importing the package has no side effects.
   if (!namesLoaded) {
@@ -84,24 +82,20 @@ export function parseSvgColor(value: string | null | undefined): EmbThread | nul
   return thread;
 }
 
-function parsePaint(text: string, style: SvgStyleState, context: StyleContext): EmbThread | null {
+function parsePaint(text: string, style: SvgStyleState): EmbThread | null {
   if (text.toLowerCase() === "currentcolor") return style.color;
   const reference = text.match(/^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)\s*(.*)$/i);
   if (reference === null) return parseSvgColor(text);
-  return context.resolvePaint(reference[1]) ?? parseSvgColor(reference[2]);
+  return parseSvgColor(reference[2]);
 }
 
-function applyProperty(
-  style: SvgStyleState,
-  [name, text]: Declaration,
-  context: StyleContext
-): void {
+function applyProperty(style: SvgStyleState, [name, text]: Declaration): void {
   const keyword = text.toLowerCase();
   if (keyword === "inherit") return;
   switch (name) {
     case "stroke":
     case "fill":
-      style[name] = parsePaint(text, style, context);
+      style[name] = parsePaint(text, style);
       break;
     case "color":
       style.color = parseSvgColor(text) ?? style.color;
@@ -119,18 +113,24 @@ function applyProperty(
       style.dashOffset = parseSvgLength(text) ?? style.dashOffset;
       break;
     case "stroke-dasharray": {
-      const values = keyword === "none"
-        ? []
-        : text.split(/[\s,]+/).map(parseSvgLength).filter((item) => item !== null);
+      const values =
+        keyword === "none"
+          ? []
+          : text
+              .split(/[\s,]+/)
+              .map(parseSvgLength)
+              .filter((item) => item !== null);
       style.dashArray = values.length > 0 ? values : null;
       break;
     }
     case "fill-rule":
-      if (keyword === "evenodd" || keyword === "nonzero") style.fillRule = keyword;
+      if (keyword === "evenodd" || keyword === "nonzero")
+        style.fillRule = keyword;
       break;
     case "opacity": {
       const opacity = Number(text);
-      if (Number.isFinite(opacity)) style.opacity *= Math.max(0, Math.min(1, opacity));
+      if (Number.isFinite(opacity))
+        style.opacity *= Math.max(0, Math.min(1, opacity));
       break;
     }
     case "display":
@@ -143,7 +143,11 @@ function applyProperty(
 }
 
 /** Presentation attributes, then stylesheet rules, then the inline style: last one wins. */
-export function cascade(element: Element, tag: string, rules: CssRule[]): Declaration[] {
+export function cascade(
+  element: Element,
+  tag: string,
+  rules: CssRule[],
+): Declaration[] {
   const declarations: Declaration[] = [];
   for (const property of PRESENTATION_ATTRIBUTES) {
     const value = element.getAttribute(property)?.trim();
@@ -154,19 +158,28 @@ export function cascade(element: Element, tag: string, rules: CssRule[]): Declar
   return declarations;
 }
 
-export function declaredValue(element: Element, tag: string, rules: CssRule[], property: string): string | null {
-  return cascade(element, tag, rules).filter(([name]) => name === property).pop()?.[1] ?? null;
+export function declaredValue(
+  element: Element,
+  tag: string,
+  rules: CssRule[],
+  property: string,
+): string | null {
+  return (
+    cascade(element, tag, rules)
+      .filter(([name]) => name === property)
+      .pop()?.[1] ?? null
+  );
 }
 
 export function applySvgStyle(
   element: Element,
   tag: string,
   inherited: SvgStyleState,
-  context: StyleContext = NO_STYLES
+  cssRules: CssRule[],
 ): SvgStyleState {
   const style = { ...inherited };
-  for (const declaration of cascade(element, tag, context.rules)) {
-    applyProperty(style, declaration, context);
+  for (const declaration of cascade(element, tag, cssRules)) {
+    applyProperty(style, declaration);
   }
   return style;
 }

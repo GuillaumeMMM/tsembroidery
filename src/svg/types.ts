@@ -1,5 +1,5 @@
 import type { EmbThread } from "../thread.js";
-import type { Matrix } from "../matrix.js";
+import type { Matrix } from "./transform.js";
 
 export interface SvgStrokeStyle {
   color: EmbThread;

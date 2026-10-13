@@ -4,8 +4,9 @@ import {
   EmbPattern,
   EmbThread,
   writeSvg,
-  towards,
 } from "./internal.ts";
+
+const towards = (a: number, b: number, amount: number) => amount * (b - a) + a;
 
 const svgHeader = (width: string, height: string, viewBox: string) =>
   `<svg version="1.1" xmlns="http://www.w3.org/2000/svg"` +

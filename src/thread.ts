@@ -1,4 +1,4 @@
-import { pyRound } from "./pyMath.js";
+import { pyRound } from "./utils.js";
 import type { SvgThreadInfo } from "./svg/types.js";
 
 export type ColorSource = number | EmbThread;
@@ -22,7 +22,6 @@ export function colorDistanceRedMean(
   );
 }
 
-/** Skips null entries; ties go to the last match. */
 export function findNearestColorIndex(
   findColor: ColorSource,
   values: (EmbThread | null)[],
@@ -53,14 +52,8 @@ export function findNearestColorIndex(
   return closestIndex;
 }
 
-/**
- * Data apps attach to a thread, by key. Add typed keys with module augmentation:
- * `declare module "@guillaumemmm/tsembroidery" { interface ThreadExtras { myApp?: MyData } }`.
- * Kept in memory only: no reader fills it and no writer saves it.
- */
 export interface ThreadExtras {
   [key: string]: unknown;
-  /** Set by `readSvg`. */
   svg?: SvgThreadInfo;
 }
 
@@ -77,10 +70,6 @@ export class EmbThread {
   setColor(r: number, g: number, b: number): void {
     this.color =
       (0xff000000 | ((r & 255) << 16) | ((g & 255) << 8) | (b & 255)) >>> 0;
-  }
-
-  getOpaqueColor(): number {
-    return (0xff000000 | this.color) >>> 0;
   }
 
   getRed(): number {
@@ -104,7 +93,6 @@ export class EmbThread {
     return `#${hex(this.getRed())}${hex(this.getGreen())}${hex(this.getBlue())}`;
   }
 
-  // pyembroidery reverses 3-digit hex (#abc -> #ccbbaa); this expands it the CSS way.
   setHexColor(hexString: string): void {
     const h = hexString.replace(/^#+/, "");
     const size = h.length;

@@ -1,17 +1,11 @@
-import { EmbConstant } from "./constants.js";
-import type { EmbPattern } from "./pattern.js";
-import type { EncoderSettings } from "./encoder.js";
-
-const { CONTINGENCY_SEQUIN_STITCH } = EmbConstant;
+import { EmbConstant } from "../constants.js";
+import type { EmbPattern } from "../pattern.js";
+import type { EncoderSettings } from "../encoder.js";
 
 export interface SvgWriteSettings extends EncoderSettings {
-  /** Run the encoder first. Default true. */
   encode?: boolean;
-  /** Regroup stitches into clean runs before drawing. Default false. */
-  stable?: boolean;
 }
 
-/** Python str() for numbers (inf, -inf, nan). */
 function numStr(v: number): string {
   if (Number.isFinite(v)) return String(v);
   if (Number.isNaN(v)) return "nan";
@@ -46,17 +40,18 @@ function serializeSvg(pattern: EmbPattern): string {
   return out;
 }
 
-/** Draws a pattern as SVG: one path per stitch run, in 0.1 mm units. */
-export function writeSvg(pattern: EmbPattern, settings?: SvgWriteSettings): string {
-  const { stable = false, ...s }: SvgWriteSettings = { ...(settings ?? {}) };
-  if (stable) pattern = pattern.getStablePattern();
+export function writeSvg(
+  pattern: EmbPattern,
+  settings?: SvgWriteSettings,
+): string {
+  const s: SvgWriteSettings = { ...(settings ?? {}) };
 
   if (s.encode ?? true) {
     if (s.max_jump === undefined) s.max_jump = Infinity;
     if (s.max_stitch === undefined) s.max_stitch = Infinity;
     if (s.full_jump === undefined) s.full_jump = false;
     if (s.sequin_contingency === undefined) {
-      s.sequin_contingency = CONTINGENCY_SEQUIN_STITCH;
+      s.sequin_contingency = EmbConstant.CONTINGENCY_SEQUIN_STITCH;
     }
     pattern = pattern.getNormalizedPattern(s);
   }

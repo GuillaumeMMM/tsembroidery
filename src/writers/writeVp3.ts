@@ -1,16 +1,32 @@
 /** Port of pyembroidery's Vp3Writer. */
-import { ByteWriter } from "./binaryWriter.js";
-import { EmbConstant } from "./constants.js";
-import type { EncoderSettings } from "./encoder.js";
-import { EmbPattern, type Extents, type Stitch } from "./pattern.js";
-import type { EmbThread } from "./thread.js";
+import { ByteWriter } from "../binaryWriter.js";
+import { EmbConstant } from "../constants.js";
+import type { EncoderSettings } from "../encoder.js";
+import { EmbPattern, type Extents, type Stitch } from "../pattern.js";
+import type { EmbThread } from "../thread.js";
 
-const { COMMAND_MASK, FLAGS_MASK, STITCH, JUMP, TRIM, STOP, END, COLOR_CHANGE, SEQUIN_MODE, SEQUIN_EJECT } =
-  EmbConstant;
+const {
+  COMMAND_MASK,
+  FLAGS_MASK,
+  STITCH,
+  JUMP,
+  TRIM,
+  STOP,
+  END,
+  COLOR_CHANGE,
+  SEQUIN_MODE,
+  SEQUIN_EJECT,
+} = EmbConstant;
 
 const PRODUCER = "Produced by     Software Ltd";
 /** Color changes split blocks; VP3 has no jumps: the next stitch moves there. */
-const SKIPPED = new Set<number>([COLOR_CHANGE, SEQUIN_MODE, SEQUIN_EJECT, STOP, JUMP]);
+const SKIPPED = new Set<number>([
+  COLOR_CHANGE,
+  SEQUIN_MODE,
+  SEQUIN_EJECT,
+  STOP,
+  JUMP,
+]);
 
 export interface Vp3WriteSettings extends EncoderSettings {
   /** Run the encoder first, splitting moves longer than VP3 allows. Default true. */
@@ -53,7 +69,12 @@ function writeThread(out: ByteWriter, thread: EmbThread): void {
   writeString8(out, thread.brand ?? "");
 }
 
-function writeStitches(out: ByteWriter, stitches: Stitch[], firstX: number, firstY: number): void {
+function writeStitches(
+  out: ByteWriter,
+  stitches: Stitch[],
+  firstX: number,
+  firstY: number,
+): void {
   const close = block(out, [0x00, 0x01, 0x00]);
   out.writeBytes([0x0a, 0xf6, 0x00]);
   let x = firstX;
@@ -75,7 +96,11 @@ function writeStitches(out: ByteWriter, stitches: Stitch[], firstX: number, firs
     x += dx;
     y += dy;
     if (command !== STITCH) continue;
-    if (Math.abs(dx) <= 127 && Math.abs(dy) <= 127 && (stitch[2] & FLAGS_MASK) === 0) {
+    if (
+      Math.abs(dx) <= 127 &&
+      Math.abs(dy) <= 127 &&
+      (stitch[2] & FLAGS_MASK) === 0
+    ) {
       out.writeBytes([dx & 0xff, dy & 0xff]);
     } else {
       out.writeBytes([0x80, 0x01]);
@@ -93,12 +118,16 @@ function writeColorblock(
   centerX: number,
   centerY: number,
   stitches: Stitch[],
-  thread: EmbThread
+  thread: EmbThread,
 ): void {
   const close = block(out, [0x00, 0x05, 0x00]);
-  let [firstX, firstY] = stitches.length > 0 ? [stitches[0][0], stitches[0][1]] : [0, 0];
+  let [firstX, firstY] =
+    stitches.length > 0 ? [stitches[0][0], stitches[0][1]] : [0, 0];
   if (first) [firstX, firstY] = [0, 0];
-  const [lastX, lastY] = stitches.length > 0 ? [stitches[stitches.length - 1][0], stitches[stitches.length - 1][1]] : [0, 0];
+  const [lastX, lastY] =
+    stitches.length > 0
+      ? [stitches[stitches.length - 1][0], stitches[stitches.length - 1][1]]
+      : [0, 0];
   out.writeUint32be(vp3(firstX - centerX));
   out.writeUint32be(vp3(-(firstY - centerY)));
   writeThread(out, thread);
@@ -109,7 +138,11 @@ function writeColorblock(
   close();
 }
 
-function writeDesign(out: ByteWriter, extents: Extents, colorblocks: [Stitch[], EmbThread][]): void {
+function writeDesign(
+  out: ByteWriter,
+  extents: Extents,
+  colorblocks: [Stitch[], EmbThread][],
+): void {
   const close = block(out, [0x00, 0x03, 0x00]);
   const width = extents.maxX - extents.minX;
   const height = extents.maxY - extents.minY;
@@ -118,7 +151,14 @@ function writeDesign(out: ByteWriter, extents: Extents, colorblocks: [Stitch[], 
   out.writeUint32be(vp3(centerX));
   out.writeUint32be(-vp3(centerY));
   out.writeBytes([0, 0, 0]);
-  for (const value of [-vp3(width / 2), vp3(width / 2), -vp3(height / 2), vp3(height / 2), vp3(width), vp3(height)]) {
+  for (const value of [
+    -vp3(width / 2),
+    vp3(width / 2),
+    -vp3(height / 2),
+    vp3(height / 2),
+    vp3(width),
+    vp3(height),
+  ]) {
     out.writeUint32be(value);
   }
   writeString16(out, ""); // Notes and settings.
@@ -127,12 +167,17 @@ function writeDesign(out: ByteWriter, extents: Extents, colorblocks: [Stitch[], 
   out.writeBytes(new TextEncoder().encode("xxPP\x01\x00"));
   writeString16(out, PRODUCER);
   out.writeUint16be(colorblocks.length);
-  colorblocks.forEach(([stitches, thread], i) => writeColorblock(out, i === 0, centerX, centerY, stitches, thread));
+  colorblocks.forEach(([stitches, thread], i) =>
+    writeColorblock(out, i === 0, centerX, centerY, stitches, thread),
+  );
   close();
 }
 
 /** Serializes a pattern as a Husqvarna Viking / Pfaff .vp3 file. */
-export function writeVp3(source: EmbPattern, settings: Vp3WriteSettings = {}): Uint8Array {
+export function writeVp3(
+  source: EmbPattern,
+  settings: Vp3WriteSettings = {},
+): Uint8Array {
   const { encode = true, ...encoderSettings } = settings;
   const pattern = encode
     ? source.getNormalizedPattern({
@@ -155,9 +200,16 @@ export function writeVp3(source: EmbPattern, settings: Vp3WriteSettings = {}): U
   const close = block(out, [0x00, 0x02, 0x00]);
   writeString16(out, ""); // Notes and settings.
   const extents: Extents =
-    pattern.stitches.length > 0 ? pattern.extents() : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    pattern.stitches.length > 0
+      ? pattern.extents()
+      : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   const colorblocks = [...pattern.getAsColorblocks()];
-  for (const value of [extents.maxX, -extents.minY, extents.minX, -extents.maxY]) {
+  for (const value of [
+    extents.maxX,
+    -extents.minY,
+    extents.minX,
+    -extents.maxY,
+  ]) {
     out.writeUint32be(Math.trunc(value * 100));
   }
   out.writeUint32be(pattern.stitches.length - pattern.countStitchCommands(END));

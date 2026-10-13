@@ -1,6 +1,6 @@
 /** Port of pyembroidery's JefReader. */
 import { signed8 } from "../binary.js";
-import { getJefThreadSet } from "../jefThreads.js";
+import { getJefThreadSet } from "../palettes/jefThreads.js";
 import { EmbPattern } from "../pattern.js";
 import type { EmbThread } from "../thread.js";
 
@@ -10,14 +10,19 @@ const PALETTE_START = 0x74;
 export function readJef(bytes: Uint8Array): EmbPattern {
   const out = new EmbPattern();
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const int32 = (offset: number) => (offset + 4 <= bytes.length ? view.getInt32(offset, true) : 0);
+  const int32 = (offset: number) =>
+    offset + 4 <= bytes.length ? view.getInt32(offset, true) : 0;
   const stitchesStart = int32(0);
   const colorCount = int32(24);
 
   // Index 0 marks a stop rather than a thread.
   const jefThreads = getJefThreadSet();
   const threads: (EmbThread | null)[] = [];
-  for (let i = 0; i < colorCount && PALETTE_START + 4 * i + 4 <= bytes.length; i++) {
+  for (
+    let i = 0;
+    i < colorCount && PALETTE_START + 4 * i + 4 <= bytes.length;
+    i++
+  ) {
     const index = Math.abs(int32(PALETTE_START + 4 * i));
     threads.push(index === 0 ? null : jefThreads[index % jefThreads.length]);
   }

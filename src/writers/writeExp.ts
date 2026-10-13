@@ -1,9 +1,9 @@
 /** Port of pyembroidery's ExpWriter. */
-import { ByteWriter } from "./binaryWriter.js";
-import { EmbConstant } from "./constants.js";
-import type { EncoderSettings } from "./encoder.js";
-import { EmbPattern } from "./pattern.js";
-import { pyRound } from "./pyMath.js";
+import { ByteWriter } from "../binaryWriter.js";
+import { EmbConstant } from "../constants.js";
+import type { EncoderSettings } from "../encoder.js";
+import { EmbPattern } from "../pattern.js";
+import { pyRound } from "../utils.js";
 
 const { COMMAND_MASK, STITCH, JUMP, TRIM, STOP, COLOR_CHANGE } = EmbConstant;
 
@@ -17,14 +17,19 @@ export interface ExpWriteSettings extends EncoderSettings {
 
 function writeDelta(out: ByteWriter, dx: number, dy: number): void {
   if (Math.abs(dx) > MAX_DELTA || Math.abs(dy) > MAX_DELTA) {
-    throw new RangeError(`writeExp: a move exceeds the EXP limit of ${MAX_DELTA}`);
+    throw new RangeError(
+      `writeExp: a move exceeds the EXP limit of ${MAX_DELTA}`,
+    );
   }
   out.writeUint8(dx & 0xff);
   out.writeUint8(-dy & 0xff);
 }
 
 /** Serializes a pattern as a Melco .exp file. EXP stores no thread colors. */
-export function writeExp(source: EmbPattern, settings: ExpWriteSettings = {}): Uint8Array {
+export function writeExp(
+  source: EmbPattern,
+  settings: ExpWriteSettings = {},
+): Uint8Array {
   const { encode = true, ...encoderSettings } = settings;
   const pattern = encode
     ? source.getNormalizedPattern({

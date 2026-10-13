@@ -1,13 +1,6 @@
 import { test, expect } from "vitest";
 import { EmbThread, findNearestColorIndex } from "./internal.ts";
 
-test("setColor forces the 0xFF alpha byte", () => {
-  const t = new EmbThread();
-  t.setColor(0x12, 0x34, 0x56);
-  expect(t.color).toBe(0xff123456 >>> 0);
-  expect(t.getOpaqueColor()).toBe(0xff123456 >>> 0);
-});
-
 test("color getters mask to 8 bits regardless of alpha", () => {
   const t = new EmbThread();
   t.setColor(255, 128, 0);

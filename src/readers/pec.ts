@@ -1,7 +1,7 @@
 import { ByteReader, readInt8, readInt24le } from "../binary.js";
 import { EmbPattern } from "../pattern.js";
 import { EmbThread } from "../thread.js";
-import { getThreadSet } from "../pecThreads.js";
+import { getThreadSet } from "../palettes/pecThreads.js";
 
 const JUMP_CODE = 0x10;
 const TRIM_CODE = 0x20;
@@ -18,11 +18,18 @@ function signed7(b: number): number {
   return b;
 }
 
-export function readPec(f: ByteReader, out: EmbPattern, pesChart: EmbThread[] | null = null): void {
+export function readPec(
+  f: ByteReader,
+  out: EmbPattern,
+  pesChart: EmbThread[] | null = null,
+): void {
   f.seek(3, 1);
   const label = f.read(16);
   try {
-    out.metadata("Label", new TextDecoder("utf-8", { fatal: true }).decode(label).trim());
+    out.metadata(
+      "Label",
+      new TextDecoder("utf-8", { fatal: true }).decode(label).trim(),
+    );
   } catch {
     // Invalid UTF-8: no label.
   }
@@ -38,7 +45,9 @@ export function readPec(f: ByteReader, out: EmbPattern, pesChart: EmbThread[] | 
 
   const lengthValue = readInt24le(f);
   if (lengthValue === null) {
-    throw new Error("readPec: unexpected end of file reading stitch block length");
+    throw new Error(
+      "readPec: unexpected end of file reading stitch block length",
+    );
   }
   // The length is counted from 2 bytes before its own field.
   const stitchBlockEnd = lengthValue - 5 + f.tell();
@@ -61,7 +70,7 @@ function processPecColors(colorBytes: Uint8Array, out: EmbPattern): void {
 function processPecTable(
   colorBytes: Uint8Array,
   out: EmbPattern,
-  chart: EmbThread[]
+  chart: EmbThread[],
 ): void {
   const threadSet = getThreadSet();
   const maxValue = threadSet.length;
@@ -81,7 +90,7 @@ function processPecTable(
 function mapPecColors(
   colorBytes: Uint8Array,
   out: EmbPattern,
-  chart: EmbThread[] | null
+  chart: EmbThread[] | null,
 ): void {
   if (chart === null || chart.length === 0) {
     processPecColors(colorBytes, out);

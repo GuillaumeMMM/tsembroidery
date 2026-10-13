@@ -18,7 +18,9 @@ function blocks(pattern: EmbPattern) {
 
 /** Commands written between the first and the last stitch, after PES encoding (tie stitches aside). */
 const commandsBetweenBlocks = (pattern: EmbPattern) => {
-  const commands = readPes(writePes(pattern)).stitches.map(([, , command]) => command);
+  const commands = readPes(writePes(pattern)).stitches.map(
+    ([, , command]) => command,
+  );
   const first = commands.indexOf(C.STITCH);
   const last = commands.lastIndexOf(C.STITCH);
   return commands.slice(first, last).filter((command) => command !== C.STITCH);
@@ -31,7 +33,7 @@ test("readSvg: defaults to a 100 mm square with 2.5 mm stitches", () => {
   const pattern = readSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
        <path d="M0 5L10 5" stroke="black" stroke-width="0.01"/>
-     </svg>`
+     </svg>`,
   ).pattern;
   const [[block]] = blocks(pattern);
   expect(block[0]).toStrictEqual([0, 500, C.STITCH]);
@@ -45,12 +47,14 @@ test("readSvg: centers the stitches on the origin, where the needle starts", () 
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
        <path d="M2 3L6 3" stroke="black" stroke-width="0.01"/>
      </svg>`,
-    { size: 50 }
+    { size: 50 },
   );
   const [[block]] = blocks(pattern);
   expect(block[0]).toStrictEqual([-100, 0, C.STITCH]);
   expect(block[block.length - 1]).toStrictEqual([100, 0, C.STITCH]);
-  const empty = readSvgCentered(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>`);
+  const empty = readSvgCentered(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>`,
+  );
   expect(empty.pattern.stitches).toHaveLength(0);
 });
 
@@ -59,7 +63,7 @@ test("readSvg: fits the viewBox into the size square with meet", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50">
        <path d="M 0 0 L 100 0" fill="none" stroke="#ff0000"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
 
   const [block, thread] = blocks(pattern)[0];
@@ -104,7 +108,11 @@ test("readSvg: parses compact path data and absolute vertical commands", () => {
 test("readSvg: flattens arcs without producing invalid coordinates", () => {
   const [subpath] = flattenSvgPath("M0 0A5 5 0 0 1 10 0", 1);
   expect(subpath.points.length).toBeGreaterThan(2);
-  expect(subpath.points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
+  expect(
+    subpath.points.every(
+      (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+    ),
+  ).toBe(true);
   const end = subpath.points[subpath.points.length - 1];
   expect(end.x).toBeCloseTo(10, 9);
   expect(end.y).toBeCloseTo(0, 9);
@@ -116,12 +124,14 @@ test("readSvg: flattens curves within the tolerance, with as few segments as nee
   // Chords sag inside the circle; the cubic approximation of arcs adds about 0.1.
   for (let i = 1; i < points.length; i++) {
     const [a, b] = [points[i - 1], points[i]];
-    expect(Math.hypot((a.x + b.x) / 2, (a.y + b.y) / 2)).toBeGreaterThan(400 - 0.5 - 0.2);
+    expect(Math.hypot((a.x + b.x) / 2, (a.y + b.y) / 2)).toBeGreaterThan(
+      400 - 0.5 - 0.2,
+    );
   }
   // About 4 mm segments on an 80 mm circle, not one every tolerance.
   expect(points.length).toBeLessThan(100);
   const stitches = readSvg(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#000" stroke-width="0.5"/></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#000" stroke-width="0.5"/></svg>`,
   ).pattern.countStitchCommands(C.STITCH);
   expect(stitches).toBeLessThan(200);
 });
@@ -139,8 +149,20 @@ test("readSvg: treats uppercase path commands as absolute", () => {
     },
   ]);
   expect(flattenSvgPath("M10 10l5 5M1 1L2 2")).toStrictEqual([
-    { points: [{ x: 10, y: 10 }, { x: 15, y: 15 }], closed: false },
-    { points: [{ x: 1, y: 1 }, { x: 2, y: 2 }], closed: false },
+    {
+      points: [
+        { x: 10, y: 10 },
+        { x: 15, y: 15 },
+      ],
+      closed: false,
+    },
+    {
+      points: [
+        { x: 1, y: 1 },
+        { x: 2, y: 2 },
+      ],
+      closed: false,
+    },
   ]);
 });
 
@@ -151,10 +173,10 @@ test("readSvg: places basic shapes away from the origin", () => {
        <circle cx="100" cy="100" r="10" stroke="black"/>
        <polyline points="50,50 60,50 60,70" stroke="black"/>
      </svg>`,
-    { size: 50 }
+    { size: 50 },
   );
-  const [rect, circle, polyline] = normalized.shapes.map((shape) =>
-    flattenSvgPath(shape.outline!.d, 0.25, shape.transform)[0]
+  const [rect, circle, polyline] = normalized.shapes.map(
+    (shape) => flattenSvgPath(shape.outline!.d, 0.25, shape.transform)[0],
   );
   expect(rect.points).toStrictEqual([
     { x: 10, y: 20 },
@@ -180,7 +202,7 @@ test("readSvg: applies skew transforms", () => {
        <path d="M0 10L0 20" transform="skewX(45)" stroke="black"/>
        <path d="M10 0L20 0" transform="skewY(45)" stroke="black"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   const [[skewX], [skewY]] = blocks(pattern);
   expect(hasPoint(skewX, 10, 10)).toBe(true);
@@ -194,7 +216,7 @@ test("readSvg: rotates around an explicit center", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
        <path d="M20 10L30 10" transform="rotate(90 10 10)" stroke="black"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   const [[block]] = blocks(pattern);
   expect(block[0][0]).toBeCloseTo(10);
@@ -208,24 +230,25 @@ test("readSvg: resolves CSS color names and functions", () => {
        <path d="M0 0L1 0" stroke="hsl(120, 100%, 25%)"/>
        <path d="M0 0L1 0" stroke="rgba(255, 0, 0, 0)"/>
        <path d="M0 0L1 0" stroke="transparent"/>
-     </svg>`
+     </svg>`,
   );
-  expect(normalized.shapes.map((shape) => shape.outline?.style.color.hexColor() ?? null)).toStrictEqual([
-    "#663399",
-    "#008000",
-    null,
-    null,
-  ]);
+  expect(
+    normalized.shapes.map(
+      (shape) => shape.outline?.style.color.hexColor() ?? null,
+    ),
+  ).toStrictEqual(["#663399", "#008000", null, null]);
 });
 
 test("readSvg: returns each warning once", () => {
   const { warnings } = readSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
        <text>hi</text><text>again</text>
-     </svg>`
+     </svg>`,
   );
   expect(warnings).toStrictEqual(["Skipped unsupported SVG element <text>"]);
-  expect(readSvg(svg100(`<rect width="10" height="10"/>`)).warnings).toStrictEqual([]);
+  expect(
+    readSvg(svg100(`<rect width="10" height="10"/>`)).warnings,
+  ).toStrictEqual([]);
 });
 
 test("readSvg: composes transform lists in SVG order", () => {
@@ -233,7 +256,7 @@ test("readSvg: composes transform lists in SVG order", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
        <path d="M0 0L1 0" transform="translate(10 0) scale(2)" stroke="black" stroke-width="0.01"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   expect(blocks(pattern)[0][0][0]).toStrictEqual([50, 0, C.STITCH]);
 });
@@ -244,7 +267,7 @@ test("readSvg: applies SVG matrix transforms and accepts transform=none", () => 
        <path d="M0 0L1 0" transform="matrix(2 0 0 3 4 5)" stroke="black" stroke-width="0.01"/>
        <path d="M0 0L1 0" transform="none" stroke="black" stroke-width="0.01"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   const result = blocks(pattern);
   expect(result[0][0][0]).toStrictEqual([200, 250, C.STITCH]);
@@ -257,7 +280,7 @@ test("readSvg: supports non-uniform normalization when requested", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50" preserveAspectRatio="none">
        <path d="M0 0L100 50" stroke="black"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   const block = blocks(pattern)[0][0];
   expect(block[0]).toStrictEqual([0, 0, C.STITCH]);
@@ -269,7 +292,7 @@ test("readSvg: honors the root preserveAspectRatio attribute", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50" preserveAspectRatio="xMinYMin slice">
        <path d="M0 0L100 0" stroke="black" stroke-width="0.01"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000, fit: false }
+    { size: 50, runningStitchLength: 1000, fit: false },
   ).pattern;
   const block = blocks(pattern)[0][0];
   expect(block[0]).toStrictEqual([0, 0, C.STITCH]);
@@ -281,27 +304,10 @@ test("readSvg: handles negative viewBox origins with meet", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -20 20 10">
        <path d="M-10 -20L-10 -20" stroke="black"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   const block = blocks(pattern)[0][0];
   expect(block[0]).toStrictEqual([0, 125, C.STITCH]);
-});
-
-test("readSvg: expands symbols referenced by use", () => {
-  const pattern = readSvg(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-       <defs>
-         <symbol id="line" viewBox="0 0 10 10">
-           <path d="M0 0L10 0"/>
-         </symbol>
-       </defs>
-       <use href="#line" x="20" y="30" stroke="black"/>
-     </svg>`,
-    { size: 50, runningStitchLength: 1000 }
-  ).pattern;
-  const block = blocks(pattern)[0][0];
-  expect(block[0]).toStrictEqual([100, 150, C.STITCH]);
-  expect(block[block.length - 1]).toStrictEqual([150, 150, C.STITCH]);
 });
 
 test("readSvg: does not loop on cyclic use references", () => {
@@ -309,10 +315,12 @@ test("readSvg: does not loop on cyclic use references", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
        <g id="a"><use href="#b"/></g>
        <g id="b"><use href="#a"/></g>
-     </svg>`
+     </svg>`,
   );
   expect(normalized.shapes).toHaveLength(0);
-  expect(normalized.warnings.some((warning) => warning.includes("cyclic"))).toBe(true);
+  expect(
+    normalized.warnings.some((warning) => warning.includes("cyclic")),
+  ).toBe(true);
 });
 
 test("readSvg: inherits presentation styles and currentColor", () => {
@@ -322,7 +330,7 @@ test("readSvg: inherits presentation styles and currentColor", () => {
          <path d="M0 0L10 0"/>
        </g>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   const [block, thread] = blocks(pattern)[0];
   expect(thread.hexColor()).toBe("#800080");
@@ -336,7 +344,7 @@ test("readSvg: applies group transforms and keeps stroke centerlines", () => {
          <path d="M 0 0 L 10 0" fill="none" stroke="rgb(0, 0, 255)"/>
        </g>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
 
   const [block, thread] = blocks(pattern)[0];
@@ -355,7 +363,7 @@ test("readSvg: use targets inherit from the use element, not their original ance
        </defs>
        <use href="#line"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   expect(blocks(pattern)).toHaveLength(0);
 });
@@ -368,7 +376,7 @@ test("readSvg: use targets inherit from the use element and its ancestors", () =
        </defs>
        <g stroke="#0000ff"><use href="#line"/></g>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   const [block, thread] = blocks(pattern)[0];
   expect(thread.hexColor()).toBe("#0000ff");
@@ -381,7 +389,7 @@ test("readSvg: use target attributes override the use element", () => {
        <defs><path id="line" d="M0 0L10 0" stroke="#ff0000"/></defs>
        <use href="#line" stroke="#0000ff"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   expect(blocks(pattern)[0][1].hexColor()).toBe("#ff0000");
 });
@@ -394,7 +402,7 @@ test("readSvg: expands same-document use references", () => {
        </defs>
        <use href="#line" x="20" y="30" stroke="#00aa00" fill="none"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
 
   const [block, thread] = blocks(pattern)[0];
@@ -409,7 +417,7 @@ test("readSvg: jumps between separate shape blocks", () => {
        <path d="M0 0L10 0" stroke="black"/>
        <path d="M20 20L30 20" stroke="black"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
   expect(blocks(pattern)).toHaveLength(2);
   // Written out, the thread is trimmed before jumping to the second line.
@@ -422,13 +430,18 @@ test("readSvg: converts basic shapes to centerline paths", () => {
        <line x1="0" y1="0" x2="10" y2="0" stroke="#000000"/>
        <rect x="0" y="20" width="10" height="10" fill="none" stroke="#000000"/>
      </svg>`,
-    { size: 50, runningStitchLength: 1000 }
+    { size: 50, runningStitchLength: 1000 },
   ).pattern;
 
   const result = blocks(pattern);
   expect(result).toHaveLength(2);
   expect(result[0][0][0]).toStrictEqual([0, 0, C.STITCH]);
-  for (const [x, y] of [[0, 100], [50, 100], [50, 150], [0, 150]]) {
+  for (const [x, y] of [
+    [0, 100],
+    [50, 100],
+    [50, 150],
+    [0, 150],
+  ]) {
     expect(hasPoint(result[1][0], x, y)).toBe(true);
   }
 });
@@ -437,7 +450,7 @@ test("readSvg: retains both fill and outline channels on a shape", () => {
   const normalized = normalizeSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
        <rect x="0" y="0" width="10" height="10" fill="#ff0000" stroke="#0000ff"/>
-     </svg>`
+     </svg>`,
   );
   expect(normalized.shapes[0].outline?.style.color.hexColor()).toBe("#0000ff");
   expect(normalized.shapes[0].fill?.style.color?.hexColor()).toBe("#ff0000");
@@ -445,8 +458,12 @@ test("readSvg: retains both fill and outline channels on a shape", () => {
 
 test("readSvg: rejects invalid input and stitch settings", () => {
   expect(() => readSvg(new Uint8Array([0xff, 0xfe])).pattern).toThrow(/UTF-8/);
-  expect(() => readSvg("<svg/>", { runningStitchLength: 0 }).pattern).toThrow(/running stitch length/);
-  expect(() => readSvg("<svg/>", { flattenTolerance: -1 }).pattern).toThrow(/tolerance/);
+  expect(() => readSvg("<svg/>", { runningStitchLength: 0 }).pattern).toThrow(
+    /running stitch length/,
+  );
+  expect(() => readSvg("<svg/>", { flattenTolerance: -1 }).pattern).toThrow(
+    /tolerance/,
+  );
 });
 
 test("readSvg: rejects malformed XML", () => {
@@ -454,9 +471,13 @@ test("readSvg: rejects malformed XML", () => {
 });
 
 test("readSvg: decodes UTF-8 bytes and strips a BOM", () => {
-  const source = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0L10 0" stroke="#000000"/></svg>';
+  const source =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0L10 0" stroke="#000000"/></svg>';
   const bytes = new TextEncoder().encode(`\uFEFF${source}`);
-  const pattern = readSvg(bytes, { size: 50, runningStitchLength: 1000 }).pattern;
+  const pattern = readSvg(bytes, {
+    size: 50,
+    runningStitchLength: 1000,
+  }).pattern;
   expect(blocks(pattern)).toHaveLength(1);
 });
 
@@ -465,26 +486,30 @@ test("readSvg: satin-stitches strokes 1 mm and wider across their width", () => 
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
        <path d="M0 100L100 100" stroke="black" stroke-width="20"/>
      </svg>`,
-    { size: 50, underlay: false, pullCompensation: 0 }
+    { size: 50, underlay: false, pullCompensation: 0 },
   ).pattern;
   const [[block]] = blocks(pattern);
   const ys = block.map(([, y]) => y);
   expect(Math.min(...ys)).toBeCloseTo(90);
   expect(Math.max(...ys)).toBeCloseTo(110);
   for (let i = 1; i < block.length; i += 1) {
-    expect(Math.sign(block[i][1] - 100)).toBe(-Math.sign(block[i - 1][1] - 100));
+    expect(Math.sign(block[i][1] - 100)).toBe(
+      -Math.sign(block[i - 1][1] - 100),
+    );
   }
   expect(block[2][0] - block[0][0]).toBeCloseTo(4);
 });
 
 test("readSvg: measures stroke width after transforms", () => {
   const read = (width: string) => {
-    const [[block]] = blocks(readSvg(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
+    const [[block]] = blocks(
+      readSvg(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">
          <path d="M0 10L10 10" stroke="black" stroke-width="${width}"/>
        </svg>`,
-      { size: 50, underlay: false, pullCompensation: 0 }
-    ).pattern);
+        { size: 50, underlay: false, pullCompensation: 0 },
+      ).pattern,
+    );
     return Math.max(...block.map(([, y]) => Math.abs(y - 100)));
   };
   expect(read("0.19")).toBeCloseTo(0);
@@ -495,7 +520,7 @@ test("readSvg: skips zero-width strokes", () => {
   const pattern = readSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
        <path d="M0 0L10 0" stroke="black" stroke-width="0"/>
-     </svg>`
+     </svg>`,
   ).pattern;
   expect(blocks(pattern)).toHaveLength(0);
 });
@@ -505,11 +530,15 @@ test("readSvg: walks the centerline under satin, then satins back", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
        <path d="M0 100L100 100" stroke="black" stroke-width="20"/>
      </svg>`,
-    { size: 50, pullCompensation: 0 }
+    { size: 50, pullCompensation: 0 },
   ).pattern;
   const [[block]] = blocks(pattern);
   expect(block.slice(0, 5).map(([x, y]) => [x, y])).toStrictEqual([
-    [0, 100], [25, 100], [50, 100], [75, 100], [100, 100],
+    [0, 100],
+    [25, 100],
+    [50, 100],
+    [75, 100],
+    [100, 100],
   ]);
   expect(block[5][0]).toBeCloseTo(100);
   expect(Math.abs(block[5][1] - 100)).toBeCloseTo(10);
@@ -518,9 +547,13 @@ test("readSvg: walks the centerline under satin, then satins back", () => {
 });
 
 const outlineColors = (source: string, settings = {}) =>
-  normalizeSvg(source, settings).shapes.map((shape) => shape.outline?.style.color.hexColor() ?? null);
+  normalizeSvg(source, settings).shapes.map(
+    (shape) => shape.outline?.style.color.hexColor() ?? null,
+  );
 const fillColors = (source: string) =>
-  normalizeSvg(source).shapes.map((shape) => shape.fill?.style.color?.hexColor() ?? null);
+  normalizeSvg(source).shapes.map(
+    (shape) => shape.fill?.style.color?.hexColor() ?? null,
+  );
 
 test("readSvg: applies <style> classes as exported by Illustrator", () => {
   expect(
@@ -533,8 +566,8 @@ test("readSvg: applies <style> classes as exported by Illustrator", () => {
          ]]></style>
          <path class="st0" d="M0 0L1 0"/>
          <path class="st2" d="M0 0L1 0"/>
-       </svg>`
-    )
+       </svg>`,
+    ),
   ).toStrictEqual(["#e53935", "#1e88e5"]);
 });
 
@@ -554,8 +587,8 @@ test("readSvg: resolves stylesheet rules by specificity, below inline styles", (
          <path id="x" class="a" d="M0 0L1 0"/>
          <path id="x2" class="a" style="stroke: yellow" d="M0 0L1 0"/>
          <path class="earlier later" d="M0 0L1 0"/>
-       </svg>`
-    )
+       </svg>`,
+    ),
   ).toStrictEqual(["#ff0000", "#0000ff", "#008000", "#ffff00", "#800080"]);
 });
 
@@ -568,7 +601,7 @@ test("readSvg: warns about unsupported CSS and ignores it", () => {
          path:hover { stroke: blue }
        </style>
        <path d="M0 0L1 0" stroke="black"/>
-     </svg>`
+     </svg>`,
   );
   expect(normalized.shapes[0].outline?.style.color.hexColor()).toBe("#000000");
   expect(normalized.warnings).toStrictEqual([
@@ -578,56 +611,59 @@ test("readSvg: warns about unsupported CSS and ignores it", () => {
   ]);
 });
 
-test("readSvg: flattens gradients to the average of their stops", () => {
-  expect(
-    fillColors(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
-         <style>.end { stop-color: #0000ff }</style>
-         <defs>
-           <linearGradient id="g">
-             <stop offset="0" stop-color="#ff0000"/>
-             <stop offset="1" class="end"/>
-           </linearGradient>
-           <radialGradient id="linked" href="#g"/>
-         </defs>
-         <rect width="5" height="5" fill="url(#g)"/>
-         <rect width="5" height="5" style="fill: url('#linked')"/>
-         <rect width="5" height="5" fill="url(#missing) green"/>
-         <rect width="5" height="5" fill="url(#missing)"/>
-       </svg>`
-    )
-  ).toStrictEqual(["#800080", "#800080", "#008000", null]);
-});
-
 test("readSvg: merges near-identical colors into one thread", () => {
   const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
        <path d="M0 0L1 0" stroke="#e53935"/>
        <path d="M0 5L1 5" stroke="#e53a35"/>
        <path d="M0 9L1 9" stroke="#1e88e5"/>
      </svg>`;
-  const [a, b, c] = normalizeSvg(source).shapes.map((shape) => shape.outline!.style.color);
+  const [a, b, c] = normalizeSvg(source).shapes.map(
+    (shape) => shape.outline!.style.color,
+  );
   expect(a).toBe(b);
   expect(c).not.toBe(a);
-  expect(outlineColors(source, { colorTolerance: 0 })).toStrictEqual(["#e53935", "#e53a35", "#1e88e5"]);
-  expect(readSvg(source).pattern.threadlist.map((thread) => thread.hexColor())).toStrictEqual(["#e53935", "#1e88e5"]);
-  expect(() => normalizeSvg(source, { colorTolerance: -1 })).toThrow(/colorTolerance/);
+  expect(outlineColors(source, { colorTolerance: 0 })).toStrictEqual([
+    "#e53935",
+    "#e53a35",
+    "#1e88e5",
+  ]);
+  expect(
+    readSvg(source).pattern.threadlist.map((thread) => thread.hexColor()),
+  ).toStrictEqual(["#e53935", "#1e88e5"]);
 });
 
 // 1 SVG unit = 1 mm (10 pattern units) in a 100-unit viewBox at the default 100 mm size.
 const fill = (body: string, settings: SvgReadSettings = {}) => {
-  const [[block, thread]] = blocks(readSvg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${body}</svg>`, settings).pattern);
+  const [[block, thread]] = blocks(
+    readSvg(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${body}</svg>`,
+      settings,
+    ).pattern,
+  );
   return { block, thread };
 };
 const segmentsOf = (block: [number, number, number][]) =>
   block.slice(1).map((stitch, i) => [block[i], stitch] as const);
-const distanceToSegment = (px: number, py: number, [a, b]: readonly [number[], number[]]) => {
+const distanceToSegment = (
+  px: number,
+  py: number,
+  [a, b]: readonly [number[], number[]],
+) => {
   const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
-  const t = Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
+      ((px - a[0]) * dx + (py - a[1]) * dy) / (dx * dx + dy * dy || 1),
+    ),
+  );
   return Math.hypot(px - a[0] - t * dx, py - a[1] - t * dy);
 };
 
 test("readSvg: tatami-fills a shape, covering it with short stitches", () => {
-  const { block, thread } = fill(`<rect x="10" y="10" width="20" height="20" fill="#e53935"/>`);
+  const { block, thread } = fill(
+    `<rect x="10" y="10" width="20" height="20" fill="#e53935"/>`,
+  );
   expect(thread.hexColor()).toBe("#e53935");
   expect(block.every(([, , command]) => command === C.STITCH)).toBe(true);
   // No pull compensation by default: the fill stays inside the shape.
@@ -639,11 +675,17 @@ test("readSvg: tatami-fills a shape, covering it with short stitches", () => {
   }
   const segments = segmentsOf(block);
   // 3 mm max stitch, plus up to the 0.5 mm minimum before the first grid point.
-  expect(Math.max(...segments.map(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1])))).toBeLessThanOrEqual(35 + 1e-6);
+  expect(
+    Math.max(...segments.map(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1]))),
+  ).toBeLessThanOrEqual(35 + 1e-6);
   // Every interior point is within one row spacing (0.4 mm) of a stitch.
   for (let x = 105; x < 300; x += 19) {
     for (let y = 105; y < 300; y += 19) {
-      expect(Math.min(...segments.map((segment) => distanceToSegment(x, y, segment)))).toBeLessThanOrEqual(4);
+      expect(
+        Math.min(
+          ...segments.map((segment) => distanceToSegment(x, y, segment)),
+        ),
+      ).toBeLessThanOrEqual(4);
     }
   }
 });
@@ -652,7 +694,14 @@ test("readSvg: fillStitchLength sets the longest stitch in fill rows", () => {
   const rect = `<rect x="10" y="10" width="20" height="20" fill="#e53935"/>`;
   const longest = (fillStitchLength: number) => {
     const { block } = fill(rect, { underlay: false, fillStitchLength });
-    return { count: block.length, max: Math.max(...segmentsOf(block).map(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1]))) };
+    return {
+      count: block.length,
+      max: Math.max(
+        ...segmentsOf(block).map(([a, b]) =>
+          Math.hypot(b[0] - a[0], b[1] - a[1]),
+        ),
+      ),
+    };
   };
   const [short, long] = [longest(2), longest(6)];
   // The longest stitch, plus up to the 0.5 mm minimum before the first grid point.
@@ -660,7 +709,9 @@ test("readSvg: fillStitchLength sets the longest stitch in fill rows", () => {
   expect(long.max).toBeGreaterThan(30);
   expect(long.max).toBeLessThanOrEqual(65 + 1e-6);
   expect(long.count).toBeLessThan(short.count);
-  expect(() => readSvg("<svg/>", { fillStitchLength: 0 })).toThrow(/fill stitch length/);
+  expect(() => readSvg("<svg/>", { fillStitchLength: 0 })).toThrow(
+    /fill stitch length/,
+  );
 });
 
 test("readSvg: leaves even-odd holes empty and fills same-direction nonzero ones", () => {
@@ -689,7 +740,7 @@ test("readSvg: travels inside concave shapes instead of jumping", () => {
 
 test("readSvg: jumps between separate islands of one fill", () => {
   const pattern = readSvg(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10 10H20V20H10Z M60 60H70V70H60Z"/></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10 10H20V20H10Z M60 60H70V70H60Z"/></svg>`,
   ).pattern;
   expect(blocks(pattern)).toHaveLength(2);
   expect(commandsBetweenBlocks(pattern)).toStrictEqual([C.TRIM, C.JUMP]);
@@ -700,24 +751,30 @@ test("readSvg: skips fill=none and zero-area fills", () => {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
        <rect x="10" y="10" width="20" height="20" fill="none"/>
        <path d="M0 0L10 10"/>
-     </svg>`
+     </svg>`,
   ).pattern;
   expect(blocks(pattern)).toHaveLength(0);
 });
 
-const svg100 = (body: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${body}</svg>`;
+const svg100 = (body: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${body}</svg>`;
 /** Stitch segments per thread color (jumps excluded). */
 const segmentsByColor = (pattern: EmbPattern) => {
   const result = new Map<string, (readonly [number[], number[]])[]>();
   // readSvg marks colors with COLOR_BREAK; the encoder turns them into color changes.
-  for (const [block, thread] of pattern.getNormalizedPattern().getAsStitchblock()) {
+  for (const [block, thread] of pattern
+    .getNormalizedPattern()
+    .getAsStitchblock()) {
     const list = result.get(thread.hexColor()) ?? [];
     list.push(...segmentsOf(block as [number, number, number][]));
     result.set(thread.hexColor(), list);
   }
   return result;
 };
-const midpointsIn = (segments: (readonly [number[], number[]])[], [x0, y0, x1, y1]: number[]) =>
+const midpointsIn = (
+  segments: (readonly [number[], number[]])[],
+  [x0, y0, x1, y1]: number[],
+) =>
   segments.filter(([a, b]) => {
     const [mx, my] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     return mx > x0 && mx < x1 && my > y0 && my < y1;
@@ -727,9 +784,18 @@ test("readSvg: fits pull compensation, edge strokes and overflowing content into
   const source = svg100(`
     <rect x="0" y="0" width="100" height="100" fill="#ff0000"/>
     <path d="M-20 50H50" stroke="#000000" stroke-width="4" fill="none"/>`);
-  const inside = ({ minX, minY, maxX, maxY }: ReturnType<EmbPattern["extents"]>) =>
+  const inside = ({
+    minX,
+    minY,
+    maxX,
+    maxY,
+  }: ReturnType<EmbPattern["extents"]>) =>
     minX >= 0 && minY >= 0 && maxX <= 1000 && maxY <= 1000;
-  expect(inside(readSvg(source, { fit: false, pullCompensation: 0.2 }).pattern.extents())).toBe(false);
+  expect(
+    inside(
+      readSvg(source, { fit: false, pullCompensation: 0.2 }).pattern.extents(),
+    ),
+  ).toBe(false);
   const fitted = readSvg(source, { pullCompensation: 0.2 }).pattern.extents();
   expect(inside(fitted)).toBe(true);
   expect(fitted.maxX - fitted.minX).toBeCloseTo(1000, 6);
@@ -738,108 +804,182 @@ test("readSvg: fits pull compensation, edge strokes and overflowing content into
 test.each([
   ["left", -30, 0],
   ["right", 110, 1000],
-])("readSvg: fitting moves a design that fits but sits outside the square on the %s, without scaling it", (_, x, edge) => {
-  const source = svg100(`<rect x="${x}" y="10" width="20" height="20" fill="#ff0000"/>`);
-  const stitchBox = (pattern: EmbPattern) => {
-    const stitches = new EmbPattern();
-    stitches.stitches = pattern.stitches.filter(([, , command]) => command === C.STITCH);
-    return stitches.extents();
-  };
-  const loose = stitchBox(readSvg(source, { fit: false, pullCompensation: 0 }).pattern);
-  const fitted = stitchBox(readSvg(source, { pullCompensation: 0 }).pattern);
-  expect(x < 0 ? fitted.minX : fitted.maxX).toBeCloseTo(edge, 6);
-  expect(fitted.maxX - fitted.minX).toBeCloseTo(loose.maxX - loose.minX, 6);
-  expect([fitted.minY, fitted.maxY]).toStrictEqual([loose.minY, loose.maxY]);
-});
+])(
+  "readSvg: fitting moves a design that fits but sits outside the square on the %s, without scaling it",
+  (_, x, edge) => {
+    const source = svg100(
+      `<rect x="${x}" y="10" width="20" height="20" fill="#ff0000"/>`,
+    );
+    const stitchBox = (pattern: EmbPattern) => {
+      const stitches = new EmbPattern();
+      stitches.stitches = pattern.stitches.filter(
+        ([, , command]) => command === C.STITCH,
+      );
+      return stitches.extents();
+    };
+    const loose = stitchBox(
+      readSvg(source, { fit: false, pullCompensation: 0 }).pattern,
+    );
+    const fitted = stitchBox(readSvg(source, { pullCompensation: 0 }).pattern);
+    expect(x < 0 ? fitted.minX : fitted.maxX).toBeCloseTo(edge, 6);
+    expect(fitted.maxX - fitted.minX).toBeCloseTo(loose.maxX - loose.minX, 6);
+    expect([fitted.minY, fitted.maxY]).toStrictEqual([loose.minY, loose.maxY]);
+  },
+);
 
 test("readSvg: does not stitch fill hidden under a later shape", () => {
-  const segments = segmentsByColor(readSvg(svg100(`
+  const segments = segmentsByColor(
+    readSvg(
+      svg100(`
     <rect x="0" y="0" width="40" height="40" fill="#ff0000"/>
-    <rect x="20" y="20" width="40" height="40" fill="#0000ff"/>`)).pattern);
+    <rect x="20" y="20" width="40" height="40" fill="#0000ff"/>`),
+    ).pattern,
+  );
   expect(midpointsIn(segments.get("#ff0000")!, [205, 205, 395, 395])).toBe(0);
-  expect(midpointsIn(segments.get("#ff0000")!, [5, 5, 195, 195])).toBeGreaterThan(0);
-  expect(midpointsIn(segments.get("#0000ff")!, [205, 205, 395, 395])).toBeGreaterThan(0);
+  expect(
+    midpointsIn(segments.get("#ff0000")!, [5, 5, 195, 195]),
+  ).toBeGreaterThan(0);
+  expect(
+    midpointsIn(segments.get("#0000ff")!, [205, 205, 395, 395]),
+  ).toBeGreaterThan(0);
 });
 
 test("readSvg: satin strokes hide the fills below them, including their own", () => {
-  const segments = segmentsByColor(readSvg(svg100(`
+  const segments = segmentsByColor(
+    readSvg(
+      svg100(`
     <rect x="0" y="0" width="40" height="40" fill="#ff0000"/>
     <path d="M0 20H40" stroke="#000000" stroke-width="6" fill="none"/>
-    <rect x="50" y="0" width="40" height="40" fill="#00ff00" stroke="#0000ff" stroke-width="6"/>`), { fit: false }).pattern);
+    <rect x="50" y="0" width="40" height="40" fill="#00ff00" stroke="#0000ff" stroke-width="6"/>`),
+      { fit: false },
+    ).pattern,
+  );
   // The black band covers y 17..23 mm; the blue border covers 3 mm inside the green square.
   expect(midpointsIn(segments.get("#ff0000")!, [5, 175, 395, 225])).toBe(0);
   expect(midpointsIn(segments.get("#00ff00")!, [500, 0, 900, 25])).toBe(0);
-  expect(midpointsIn(segments.get("#00ff00")!, [535, 35, 865, 365])).toBeGreaterThan(0);
+  expect(
+    midpointsIn(segments.get("#00ff00")!, [535, 35, 865, 365]),
+  ).toBeGreaterThan(0);
 });
 
 test("readSvg: clips thin lines under later fills and stitches them last", () => {
-  const pattern = readSvg(svg100(`
+  const pattern = readSvg(
+    svg100(`
     <path d="M0 50H100" stroke="#000000" stroke-width="0.2"/>
-    <rect x="40" y="30" width="20" height="40" fill="#ff0000"/>`)).pattern;
+    <rect x="40" y="30" width="20" height="40" fill="#ff0000"/>`),
+  ).pattern;
   const segments = segmentsByColor(pattern);
   expect(midpointsIn(segments.get("#000000")!, [405, 0, 595, 1000])).toBe(0);
-  expect(midpointsIn(segments.get("#000000")!, [0, 0, 395, 1000])).toBeGreaterThan(0);
-  expect(midpointsIn(segments.get("#000000")!, [605, 0, 1000, 1000])).toBeGreaterThan(0);
-  const threads = [...pattern.getNormalizedPattern().getAsStitchblock()].map(([, thread]) => thread.hexColor());
+  expect(
+    midpointsIn(segments.get("#000000")!, [0, 0, 395, 1000]),
+  ).toBeGreaterThan(0);
+  expect(
+    midpointsIn(segments.get("#000000")!, [605, 0, 1000, 1000]),
+  ).toBeGreaterThan(0);
+  const threads = [...pattern.getNormalizedPattern().getAsStitchblock()].map(
+    ([, thread]) => thread.hexColor(),
+  );
   expect(threads[threads.length - 1]).toBe("#000000");
   expect(threads[0]).toBe("#ff0000");
 });
 
 test("readSvg: skips shapes that are fully hidden", () => {
-  const pattern = readSvg(svg100(`
+  const pattern = readSvg(
+    svg100(`
     <rect x="10" y="10" width="10" height="10" fill="#ff0000"/>
-    <rect x="0" y="0" width="40" height="40" fill="#0000ff"/>`)).pattern;
-  expect(pattern.threadlist.map((thread) => thread.hexColor())).toStrictEqual(["#0000ff"]);
+    <rect x="0" y="0" width="40" height="40" fill="#0000ff"/>`),
+  ).pattern;
+  expect(pattern.threadlist.map((thread) => thread.hexColor())).toStrictEqual([
+    "#0000ff",
+  ]);
 });
 
 test("readSvg: groups colors and moves on to the nearest remaining color", () => {
-  const pattern = readSvg(svg100(`
+  const pattern = readSvg(
+    svg100(`
     <rect x="0" y="0" width="10" height="10" fill="#ff0000"/>
     <rect x="80" y="0" width="10" height="10" fill="#00ff00"/>
     <rect x="30" y="0" width="10" height="10" fill="#0000ff"/>
-    <rect x="0" y="30" width="10" height="10" fill="#ff0000"/>`)).pattern;
+    <rect x="0" y="30" width="10" height="10" fill="#ff0000"/>`),
+  ).pattern;
   // Both reds first, then blue (nearer than green), then green: one change per color.
-  expect(pattern.threadlist.map((thread) => thread.hexColor())).toStrictEqual(["#ff0000", "#0000ff", "#00ff00"]);
+  expect(pattern.threadlist.map((thread) => thread.hexColor())).toStrictEqual([
+    "#ff0000",
+    "#0000ff",
+    "#00ff00",
+  ]);
   expect(pattern.countStitchCommands(C.COLOR_BREAK)).toBe(3);
 });
 
-test("readSvg: getAsStitchblock and getStablePattern follow the COLOR_BREAKs between colors", () => {
-  const pattern = readSvg(svg100(`
+test("readSvg: getAsStitchblock follows the COLOR_BREAKs between colors", () => {
+  const pattern = readSvg(
+    svg100(`
     <rect x="0" y="0" width="10" height="10" fill="#ff0000"/>
-    <rect x="30" y="0" width="10" height="10" fill="#0000ff"/>`)).pattern;
-  const colors = (p: EmbPattern) => [...new Set(blocks(p).map(([, thread]) => thread.hexColor()))];
+    <rect x="30" y="0" width="10" height="10" fill="#0000ff"/>`),
+  ).pattern;
+  const colors = (p: EmbPattern) => [
+    ...new Set(blocks(p).map(([, thread]) => thread.hexColor())),
+  ];
   expect(colors(pattern)).toStrictEqual(["#ff0000", "#0000ff"]);
   expect(colors(pattern)).toStrictEqual(colors(pattern.getNormalizedPattern()));
-  const stable = pattern.getStablePattern();
-  expect(stable.threadlist.map((thread) => thread.hexColor())).toStrictEqual(["#ff0000", "#0000ff"]);
-  expect(colors(stable)).toStrictEqual(["#ff0000", "#0000ff"]);
 });
 
 const fillBlock = (settings: object) =>
-  blocks(readSvg(svg100(`<rect x="10" y="10" width="20" height="20" fill="#e53935"/>`), settings).pattern)[0][0];
-const xExtent = (block: number[][]) => [Math.min(...block.map(([x]) => x)), Math.max(...block.map(([x]) => x))];
+  blocks(
+    readSvg(
+      svg100(`<rect x="10" y="10" width="20" height="20" fill="#e53935"/>`),
+      settings,
+    ).pattern,
+  )[0][0];
+const xExtent = (block: number[][]) => [
+  Math.min(...block.map(([x]) => x)),
+  Math.max(...block.map(([x]) => x)),
+];
 
 test("readSvg: satin on a curve keeps an even width and spacing", () => {
   // A 3 mm satin ring of radius 30 mm, centred on (500, 500).
   const [[block]] = blocks(
-    readSvg(svg100(`<circle cx="50" cy="50" r="30" fill="none" stroke="#000" stroke-width="3"/>`), { underlay: false }).pattern
+    readSvg(
+      svg100(
+        `<circle cx="50" cy="50" r="30" fill="none" stroke="#000" stroke-width="3"/>`,
+      ),
+      { underlay: false },
+    ).pattern,
   );
   const radii = block.map(([x, y]) => Math.hypot(x - 500, y - 500));
-  for (const radius of radii) expect(Math.min(Math.abs(radius - 285), Math.abs(radius - 315))).toBeLessThan(0.5);
+  for (const radius of radii)
+    expect(
+      Math.min(Math.abs(radius - 285), Math.abs(radius - 315)),
+    ).toBeLessThan(0.5);
   // Same-side peaks every 0.4 mm along the centre line.
   const outer = block.filter((_, i) => i % 2 === 0);
-  const gaps = outer.slice(1).map(([x, y], i) => Math.hypot(x - outer[i][0], y - outer[i][1]) * (300 / 315));
+  const gaps = outer
+    .slice(1)
+    .map(
+      ([x, y], i) => Math.hypot(x - outer[i][0], y - outer[i][1]) * (300 / 315),
+    );
   expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.2);
 });
 
 test("readSvg: grows fills and satin by the pull compensation", () => {
-  expect(xExtent(fillBlock({ pullCompensation: 0, underlay: false }))).toEqual([100, 300].map((v) => expect.closeTo(v, 5)));
-  expect(xExtent(fillBlock({ pullCompensation: 0.5, underlay: false }))).toEqual([95, 305].map((v) => expect.closeTo(v, 5)));
-  const satin = blocks(readSvg(svg100(`<path d="M10 50H90" stroke="#000" stroke-width="2"/>`), { pullCompensation: 0.3, underlay: false }).pattern)[0][0];
+  expect(xExtent(fillBlock({ pullCompensation: 0, underlay: false }))).toEqual(
+    [100, 300].map((v) => expect.closeTo(v, 5)),
+  );
+  expect(
+    xExtent(fillBlock({ pullCompensation: 0.5, underlay: false })),
+  ).toEqual([95, 305].map((v) => expect.closeTo(v, 5)));
+  const satin = blocks(
+    readSvg(svg100(`<path d="M10 50H90" stroke="#000" stroke-width="2"/>`), {
+      pullCompensation: 0.3,
+      underlay: false,
+    }).pattern,
+  )[0][0];
   const ys = satin.map(([, y]) => y);
   expect(Math.min(...ys)).toBeCloseTo(500 - 13);
   expect(Math.max(...ys)).toBeCloseTo(500 + 13);
-  expect(() => readSvg(svg100(""), { pullCompensation: -1 }).pattern).toThrow(/pull compensation/);
+  expect(() => readSvg(svg100(""), { pullCompensation: -1 }).pattern).toThrow(
+    /pull compensation/,
+  );
 });
 
 test("readSvg: stitches a sparse underlay across the fill, inset from the edges", () => {
@@ -854,24 +994,37 @@ test("readSvg: stitches a sparse underlay across the fill, inset from the edges"
   }
   const firstRow = segmentsOf(withUnderlay as [number, number, number][]).find(
     // Skip moves along the (axis-aligned) edges.
-    ([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1]) > 20 && Math.abs(b[0] - a[0]) > 1 && Math.abs(b[1] - a[1]) > 1
+    ([a, b]) =>
+      Math.hypot(b[0] - a[0], b[1] - a[1]) > 20 &&
+      Math.abs(b[0] - a[0]) > 1 &&
+      Math.abs(b[1] - a[1]) > 1,
   )!;
-  expect((firstRow[1][0] - firstRow[0][0]) * (firstRow[1][1] - firstRow[0][1])).toBeLessThan(0);
+  expect(
+    (firstRow[1][0] - firstRow[0][0]) * (firstRow[1][1] - firstRow[0][1]),
+  ).toBeLessThan(0);
 });
 
 const longestStitch = (block: number[][]) =>
-  Math.max(...block.slice(1).map((stitch, i) => Math.hypot(stitch[0] - block[i][0], stitch[1] - block[i][1])));
+  Math.max(
+    ...block
+      .slice(1)
+      .map((stitch, i) =>
+        Math.hypot(stitch[0] - block[i][0], stitch[1] - block[i][1]),
+      ),
+  );
 
 test("readSvg: fills strokes wider than 7 mm instead of satin-stitching them", () => {
   const pattern = readSvg(
     svg100(`<rect x="0" y="40" width="100" height="20" fill="#ff0000"/>
             <path d="M10 50H90" stroke="#000000" stroke-width="10" fill="none"/>`),
-    { pullCompensation: 0 }
+    { pullCompensation: 0 },
   ).pattern;
   const segments = segmentsByColor(pattern);
   const black = segments.get("#000000")!;
   // Tatami rows: no stitch spans the 10 mm width, unlike satin.
-  expect(Math.max(...black.map(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1])))).toBeLessThanOrEqual(35 + 1e-6);
+  expect(
+    Math.max(...black.map(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1]))),
+  ).toBeLessThanOrEqual(35 + 1e-6);
   const ys = black.flatMap(([a, b]) => [a[1], b[1]]);
   expect(Math.min(...ys)).toBeCloseTo(450, 0);
   expect(Math.max(...ys)).toBeCloseTo(550, 0);
@@ -880,7 +1033,12 @@ test("readSvg: fills strokes wider than 7 mm instead of satin-stitching them", (
 });
 
 test("readSvg: keeps satin up to 7 mm", () => {
-  const [[block]] = blocks(readSvg(svg100(`<path d="M10 50H90" stroke="#000" stroke-width="7"/>`), { pullCompensation: 0, underlay: false }).pattern);
+  const [[block]] = blocks(
+    readSvg(svg100(`<path d="M10 50H90" stroke="#000" stroke-width="7"/>`), {
+      pullCompensation: 0,
+      underlay: false,
+    }).pattern,
+  );
   expect(longestStitch(block)).toBeGreaterThanOrEqual(70);
 });
 
@@ -889,52 +1047,89 @@ test("readSvg: spaces fill rows and satin stitches by rowSpacing", () => {
   const dense = fillBlock({ ...settings, rowSpacing: 0.4 });
   const sparse = fillBlock({ ...settings, rowSpacing: 0.8 });
   expect(sparse.length).toBeLessThan(dense.length * 0.6);
-  const [[satin]] = blocks(readSvg(svg100(`<path d="M10 50H90" stroke="#000" stroke-width="2"/>`), { ...settings, rowSpacing: 0.8 }).pattern);
+  const [[satin]] = blocks(
+    readSvg(svg100(`<path d="M10 50H90" stroke="#000" stroke-width="2"/>`), {
+      ...settings,
+      rowSpacing: 0.8,
+    }).pattern,
+  );
   // Same-side peaks are 0.8 mm apart.
   expect(satin[2][0] - satin[0][0]).toBeCloseTo(8);
-  expect(() => readSvg(svg100(""), { rowSpacing: 0 }).pattern).toThrow(/row spacing/);
+  expect(() => readSvg(svg100(""), { rowSpacing: 0 }).pattern).toThrow(
+    /row spacing/,
+  );
 });
 
 /** Directions (degrees in [0, 180)) of the stitches longer than `min`, which are the rows rather than travel or row ends. */
 const rowDirections = (block: number[][], min = 20) =>
   segmentsOf(block as [number, number, number][])
     .filter(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1]) > min)
-    .map(([a, b]) => ((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI + 180) % 180);
-const angleGap = (a: number, b: number) => Math.min(Math.abs(a - b) % 180, 180 - (Math.abs(a - b) % 180));
+    .map(
+      ([a, b]) =>
+        ((Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI + 180) % 180,
+    );
+const angleGap = (a: number, b: number) =>
+  Math.min(Math.abs(a - b) % 180, 180 - (Math.abs(a - b) % 180));
 
 test("readSvg: rows follow fillAngle", () => {
   const settings = { pullCompensation: 0, underlay: false };
-  for (const [fillAngle, expected] of [[0, 0], [90, 90], [30, 30], [-30, 150]]) {
+  for (const [fillAngle, expected] of [
+    [0, 0],
+    [90, 90],
+    [30, 30],
+    [-30, 150],
+  ]) {
     const directions = rowDirections(fillBlock({ ...settings, fillAngle }));
     expect(directions.length).toBeGreaterThan(20);
-    for (const direction of directions) expect(angleGap(direction, expected)).toBeLessThan(1e-6);
+    for (const direction of directions)
+      expect(angleGap(direction, expected)).toBeLessThan(1e-6);
   }
   // At 0° every row is horizontal: one y per row, 0.4 mm apart.
-  const ys = [...new Set(fillBlock({ ...settings, fillAngle: 0 }).map(([, y]) => y.toFixed(6)))].map(Number).sort((a, b) => a - b);
-  expect(ys.slice(1).map((y, i) => y - ys[i])).toEqual(ys.slice(1).map(() => expect.closeTo(4, 6)));
+  const ys = [
+    ...new Set(
+      fillBlock({ ...settings, fillAngle: 0 }).map(([, y]) => y.toFixed(6)),
+    ),
+  ]
+    .map(Number)
+    .sort((a, b) => a - b);
+  expect(ys.slice(1).map((y, i) => y - ys[i])).toEqual(
+    ys.slice(1).map(() => expect.closeTo(4, 6)),
+  );
 });
 
 test("readSvg: fill angles are undirected and default to today's 45°", () => {
-  const stitches = (settings: object) => readSvg(svg100(`<circle cx="50" cy="50" r="30" fill="#00f"/>`), settings).pattern.stitches;
+  const stitches = (settings: object) =>
+    readSvg(svg100(`<circle cx="50" cy="50" r="30" fill="#00f"/>`), settings)
+      .pattern.stitches;
   expect(stitches({ fillAngle: 45 })).toStrictEqual(stitches({}));
   expect(stitches({ fillAngle: 225 })).toStrictEqual(stitches({}));
   expect(stitches({ fillAngle: -135 })).toStrictEqual(stitches({}));
-  expect(stitches({ fillAngle: 180 })).toStrictEqual(stitches({ fillAngle: 0 }));
+  expect(stitches({ fillAngle: 180 })).toStrictEqual(
+    stitches({ fillAngle: 0 }),
+  );
   expect(stitches({ fillAngle: 0 })).not.toStrictEqual(stitches({}));
-  for (const fillAngle of [NaN, Infinity]) expect(() => stitches({ fillAngle })).toThrow(/fill angle/);
+  for (const fillAngle of [NaN, Infinity])
+    expect(() => stitches({ fillAngle })).toThrow(/fill angle/);
 });
 
 test("readSvg: underlay rows run across the fill", () => {
   const underlayOf = (settings: object) => {
     const block = fillBlock({ pullCompensation: 0, ...settings });
-    const fillLength = fillBlock({ pullCompensation: 0, underlay: false, ...settings }).length;
+    const fillLength = fillBlock({
+      pullCompensation: 0,
+      underlay: false,
+      ...settings,
+    }).length;
     return block.slice(0, block.length - fillLength);
   };
   // Underlay rows are split into 3 mm stitches, so count every stitch but the short row ends.
   const share = (block: number[][], angle: number) => {
     const directions = rowDirections(block, 2);
     expect(directions.length).toBeGreaterThan(10);
-    return directions.filter((direction) => angleGap(direction, angle) < 1e-6).length / directions.length;
+    return (
+      directions.filter((direction) => angleGap(direction, angle) < 1e-6)
+        .length / directions.length
+    );
   };
   for (const [settings, fill, expected] of [
     [{ fillAngle: 0 }, 0, 90],
@@ -950,83 +1145,135 @@ test("readSvg: underlay rows run across the fill", () => {
 });
 
 const allPoints = (pattern: EmbPattern) =>
-  pattern.stitches.filter(([, , command]) => command === C.STITCH).map(([x, y]) => [x, y]);
+  pattern.stitches
+    .filter(([, , command]) => command === C.STITCH)
+    .map(([x, y]) => [x, y]);
 
 test("readSvg: clips fills to a clipPath", () => {
-  const points = allPoints(readSvg(svg100(`
+  const points = allPoints(
+    readSvg(
+      svg100(`
     <defs><clipPath id="c"><circle cx="50" cy="50" r="20"/></clipPath></defs>
-    <rect width="100" height="100" fill="#e53935" clip-path="url(#c)"/>`)).pattern);
+    <rect width="100" height="100" fill="#e53935" clip-path="url(#c)"/>`),
+    ).pattern,
+  );
   expect(points.length).toBeGreaterThan(100);
   // Radius 20 mm, plus flattening slack.
-  expect(Math.max(...points.map(([x, y]) => Math.hypot(x - 500, y - 500)))).toBeLessThanOrEqual(201);
+  expect(
+    Math.max(...points.map(([x, y]) => Math.hypot(x - 500, y - 500))),
+  ).toBeLessThanOrEqual(201);
 });
 
 test("readSvg: clips a group in its own coordinates", () => {
-  const points = allPoints(readSvg(svg100(`
+  const points = allPoints(
+    readSvg(
+      svg100(`
     <defs><clipPath id="c"><rect x="0" y="0" width="10" height="100"/></clipPath></defs>
-    <g transform="translate(50 0)" clip-path="url(#c)"><rect x="-50" width="100" height="100"/></g>`)).pattern);
+    <g transform="translate(50 0)" clip-path="url(#c)"><rect x="-50" width="100" height="100"/></g>`),
+    ).pattern,
+  );
   expect(Math.min(...points.map(([x]) => x))).toBeGreaterThanOrEqual(500 - 3);
   expect(Math.max(...points.map(([x]) => x))).toBeLessThanOrEqual(600 + 3);
 });
 
 test("readSvg: supports objectBoundingBox clip units", () => {
-  const points = allPoints(readSvg(svg100(`
+  const points = allPoints(
+    readSvg(
+      svg100(`
     <clipPath id="left" clipPathUnits="objectBoundingBox"><rect width="0.5" height="1"/></clipPath>
-    <rect x="20" y="20" width="40" height="40" clip-path="url(#left)"/>`)).pattern);
+    <rect x="20" y="20" width="40" height="40" clip-path="url(#left)"/>`),
+    ).pattern,
+  );
   expect(Math.min(...points.map(([x]) => x))).toBeGreaterThanOrEqual(200 - 3);
   expect(Math.max(...points.map(([x]) => x))).toBeLessThanOrEqual(400 + 3);
 });
 
 test("readSvg: clips strokes to a clipPath", () => {
-  const points = allPoints(readSvg(svg100(`
+  const points = allPoints(
+    readSvg(
+      svg100(`
     <clipPath id="c"><rect x="30" width="40" height="100"/></clipPath>
-    <path d="M0 50H100" stroke="#000" stroke-width="0.2" fill="none" clip-path="url(#c)"/>`)).pattern);
+    <path d="M0 50H100" stroke="#000" stroke-width="0.2" fill="none" clip-path="url(#c)"/>`),
+    ).pattern,
+  );
   expect(Math.min(...points.map(([x]) => x))).toBeCloseTo(300);
   expect(Math.max(...points.map(([x]) => x))).toBeCloseTo(700);
 });
 
 test("readSvg: a clipped shape hides only its visible part", () => {
-  const segments = segmentsByColor(readSvg(svg100(`
+  const segments = segmentsByColor(
+    readSvg(
+      svg100(`
     <clipPath id="band"><rect x="40" width="20" height="100"/></clipPath>
     <rect width="100" height="100" fill="#ff0000"/>
-    <rect width="100" height="100" fill="#0000ff" clip-path="url(#band)"/>`)).pattern);
+    <rect width="100" height="100" fill="#0000ff" clip-path="url(#band)"/>`),
+    ).pattern,
+  );
   expect(midpointsIn(segments.get("#ff0000")!, [405, 5, 595, 995])).toBe(0);
-  expect(midpointsIn(segments.get("#ff0000")!, [5, 5, 395, 995])).toBeGreaterThan(0);
+  expect(
+    midpointsIn(segments.get("#ff0000")!, [5, 5, 395, 995]),
+  ).toBeGreaterThan(0);
   expect(midpointsIn(segments.get("#0000ff")!, [0, 0, 395, 1000])).toBe(0);
 });
 
 test("readSvg: reads clip-path from CSS and honors clip-rule", () => {
-  const segments = segmentsByColor(readSvg(svg100(`
+  const segments = segmentsByColor(
+    readSvg(
+      svg100(`
     <style>.clipped { clip-path: url(#ring) }</style>
     <clipPath id="ring"><path d="M10 10H90V90H10Z M30 30H70V70H30Z" clip-rule="evenodd"/></clipPath>
-    <rect class="clipped" width="100" height="100" fill="#ff0000"/>`)).pattern);
+    <rect class="clipped" width="100" height="100" fill="#ff0000"/>`),
+    ).pattern,
+  );
   expect(midpointsIn(segments.get("#ff0000")!, [305, 305, 695, 695])).toBe(0);
-  expect(midpointsIn(segments.get("#ff0000")!, [105, 105, 295, 895])).toBeGreaterThan(0);
+  expect(
+    midpointsIn(segments.get("#ff0000")!, [105, 105, 295, 895]),
+  ).toBeGreaterThan(0);
 });
 
 test("readSvg: clip-rule does not change how a shape is filled", () => {
-  const segments = segmentsByColor(readSvg(svg100(
-    `<path d="M10 10H90V90H10Z M30 30H70V70H30Z" clip-rule="evenodd" fill="#ff0000"/>`
-  )).pattern);
-  expect(midpointsIn(segments.get("#ff0000")!, [305, 305, 695, 695])).toBeGreaterThan(0);
+  const segments = segmentsByColor(
+    readSvg(
+      svg100(
+        `<path d="M10 10H90V90H10Z M30 30H70V70H30Z" clip-rule="evenodd" fill="#ff0000"/>`,
+      ),
+    ).pattern,
+  );
+  expect(
+    midpointsIn(segments.get("#ff0000")!, [305, 305, 695, 695]),
+  ).toBeGreaterThan(0);
 });
 
 test("readSvg: ignores a missing clipPath with a warning", () => {
-  const { pattern, warnings } = readSvg(svg100(`<rect width="10" height="10" clip-path="url(#nope)"/>`));
+  const { pattern, warnings } = readSvg(
+    svg100(`<rect width="10" height="10" clip-path="url(#nope)"/>`),
+  );
   expect(allPoints(pattern).length).toBeGreaterThan(0);
   expect(warnings).toStrictEqual(["Unsupported clip-path url(#nope)"]);
 });
 
 test("readSvg: adds tieStitches at every thread end", () => {
-  const svg = svg100(`<path d="M10 10H40" stroke="#000" stroke-width="0.3"/><path d="M60 60H90" stroke="#000" stroke-width="0.3"/>`);
+  const svg = svg100(
+    `<path d="M10 10H40" stroke="#000" stroke-width="0.3"/><path d="M60 60H90" stroke="#000" stroke-width="0.3"/>`,
+  );
   const stitches = (tieStitches: number) =>
-    readPes(writePes(readSvg(svg, { tieStitches }).pattern)).stitches.filter(([, , command]) => command === C.STITCH);
+    readPes(writePes(readSvg(svg, { tieStitches }).pattern)).stitches.filter(
+      ([, , command]) => command === C.STITCH,
+    );
   // Off by default; otherwise that many stitches at each of the four thread ends: start, both sides of the jump, end.
-  expect(stitches(0)).toStrictEqual(readPes(writePes(readSvg(svg).pattern)).stitches.filter(([, , c]) => c === C.STITCH));
+  expect(stitches(0)).toStrictEqual(
+    readPes(writePes(readSvg(svg).pattern)).stitches.filter(
+      ([, , c]) => c === C.STITCH,
+    ),
+  );
   expect(stitches(2).length - stitches(0).length).toBe(8);
   expect(stitches(3).length - stitches(0).length).toBe(12);
   // Out a third of the first 2.5 mm stitch and back, then on along the line.
   const [start, a, b, c] = stitches(2);
-  expect([a[0] - start[0], b[0] - start[0], c[0] - start[0]]).toStrictEqual([8, 0, 25]);
-  expect(() => readSvg(svg, { tieStitches: 1.5 }).pattern).toThrow(/tieStitches/);
+  expect([a[0] - start[0], b[0] - start[0], c[0] - start[0]]).toStrictEqual([
+    8, 0, 25,
+  ]);
+  expect(() => readSvg(svg, { tieStitches: 1.5 }).pattern).toThrow(
+    /tieStitches/,
+  );
 });

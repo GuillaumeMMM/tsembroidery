@@ -24,7 +24,7 @@ export type { SvgDomParser, SvgReadSettings } from "../svg/types.js";
 
 export interface SvgReadResult {
   pattern: EmbPattern;
-  /** Parts of the SVG that were skipped or unsupported, each listed once. */
+  //  Not every svg visual feature are supported. If an element is skipped, add it to warnings.
   warnings: string[];
 }
 
@@ -41,7 +41,6 @@ export function decodeSvgInput(input: SvgInput): string {
   return source.replace(/^\uFEFF/, "");
 }
 
-/** Box around the stitches; extents() would also count the first color break, left at (0, 0). */
 function stitchExtents(pattern: EmbPattern) {
   let [minX, minY, maxX, maxY] = [Infinity, Infinity, -Infinity, -Infinity];
   for (const [x, y, command] of pattern.stitches) {
@@ -54,10 +53,7 @@ function stitchExtents(pattern: EmbPattern) {
 
 type PointMap = (point: ZonePoint) => ZonePoint;
 
-/**
- * Shrinks and moves the stitches, if needed, so they stay inside the `limit`×`limit` square at the origin.
- * Returns the scale and the point mapping applied.
- */
+//  Shrinks and moves the stitches, if needed, so they stay inside the `limit`×`limit` square at the origin.
 function fitInto(
   pattern: EmbPattern,
   limit: number,
@@ -96,7 +92,6 @@ function mapZone(zone: StitchZone, map: PointMap, scale: number): StitchZone {
 
 const KINDS: SvgStitchKind[] = ["fill", "satin", "running"];
 
-/** One `threadlist` entry: consecutive blocks of a thread. */
 interface Entry {
   thread: EmbThread;
   parts: ZonePart[];
@@ -171,7 +166,10 @@ export function stitchSvg(
     const entry = entries[entries.length - 1];
     entry.parts.push(part);
     for (const run of runs)
-      pattern.addStitchblock([tie(run, stitchSettings.tieStitches), entry.thread]);
+      pattern.addStitchblock([
+        tie(run, stitchSettings.tieStitches),
+        entry.thread,
+      ]);
   }
   if (entries.length === 0) return { pattern, warnings };
 
