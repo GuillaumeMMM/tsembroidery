@@ -154,36 +154,90 @@ function visibleItems(
   return items.reverse();
 }
 
+function closest<C>(items: Item<C>[], from: Point2 | null): Item<C> {
+  return from === null
+    ? items[0]
+    : items.reduce((best, candidate) =>
+        distance(candidate.starts[nearest(candidate.starts, from)], from) <
+        distance(best.starts[nearest(best.starts, from)], from)
+          ? candidate
+          : best
+      );
+}
+
+interface Run<C> {
+  blocks: PlannedBlock<C>[];
+  travel: number;
+}
+
+function stitchRun<C>(items: Item<C>[], start: Point2 | null, next: (pool: Item<C>[], from: Point2 | null) => Item<C>): Run<C> {
+  const run: Run<C> = { blocks: [], travel: 0 };
+  const pool = [...items];
+  let position = start;
+  while (pool.length > 0) {
+    const item = next(pool, position);
+    pool.splice(pool.indexOf(item), 1);
+    const stitches = item.stitch(position);
+    if (stitches.length === 0) continue;
+    if (position !== null) run.travel += distance(position, { x: stitches[0][0], y: stitches[0][1] });
+    run.blocks.push({ stitches, thread: item.color, part: item.part });
+    const [x, y] = stitches[stitches.length - 1];
+    position = { x, y };
+  }
+  return run;
+}
+
+function shorten(points: Point2[], start: Point2 | null): number[] {
+  const order = points.map((_, index) => index);
+  const at = (k: number) => (k < 0 ? start : k >= order.length ? null : points[order[k]]);
+  const gap = (a: Point2 | null, b: Point2 | null) => (a === null || b === null ? 0 : distance(a, b));
+  for (let improved = true; improved; ) {
+    improved = false;
+    for (let i = 0; i < order.length - 1; i += 1) {
+      for (let j = i + 1; j < order.length; j += 1) {
+        const delta = gap(at(i - 1), at(j)) + gap(at(i), at(j + 1)) - gap(at(i - 1), at(i)) - gap(at(j), at(j + 1));
+        if (delta >= -1e-9) continue;
+        order.splice(i, j - i + 1, ...order.slice(i, j + 1).reverse());
+        improved = true;
+      }
+    }
+  }
+  return order;
+}
+
+function stitchColor<C>(items: Item<C>[], start: Point2 | null): PlannedBlock<C>[] {
+  const greedy = stitchRun(items, start, closest);
+  if (greedy.blocks.length < 3) return greedy.blocks;
+  const middles = greedy.blocks.map(({ stitches }) => {
+    const [first, last] = [stitches[0], stitches[stitches.length - 1]];
+    return { x: (first[0] + last[0]) / 2, y: (first[1] + last[1]) / 2 };
+  });
+  const order = shorten(middles, start);
+  if (order.every((index, position) => index === position)) return greedy.blocks;
+  const byPart = new Map(items.map((item) => [item.part, item]));
+  const queue = order.map((index) => byPart.get(greedy.blocks[index].part)!);
+  const shorter = stitchRun(queue, start, () => queue.shift()!);
+  return shorter.travel < greedy.travel ? shorter.blocks : greedy.blocks;
+}
+
 /**
- * Fills and satin first, running strokes last. Within each, the next block is the nearest one
- * of the current color, or of any color once the current color is done.
+ * Fills and satin first, running strokes last. Within each, a color is stitched whole, its blocks
+ * in the shortest order found, then the color of the nearest remaining block.
  */
 function orderItems<C>(items: Item<C>[], start: Point2 | null): PlannedBlock<C>[] {
   const blocks: PlannedBlock<C>[] = [];
   let position: Point2 | null = start;
-  let color: C | null = null;
   for (const layer of [0, 1]) {
-    const pool = items.filter((item) => item.layer === layer);
+    let pool = items.filter((item) => item.layer === layer);
     while (pool.length > 0) {
-      const sameColor = pool.filter((item) => item.color === color);
-      const candidates = sameColor.length > 0 ? sameColor : pool;
-      const from: Point2 | null = position;
-      const item: Item<C> =
-        from === null
-          ? candidates[0]
-          : candidates.reduce((best, candidate) =>
-              distance(candidate.starts[nearest(candidate.starts, from)], from) <
-              distance(best.starts[nearest(best.starts, from)], from)
-                ? candidate
-                : best
-            );
-      pool.splice(pool.indexOf(item), 1);
-      const stitches: Stitch[] = item.stitch(from);
-      if (stitches.length === 0) continue;
-      blocks.push({ stitches, thread: item.color, part: item.part });
-      const [x, y] = stitches[stitches.length - 1];
+      const { color } = closest(pool, position);
+      const stitched = stitchColor(pool.filter((item) => item.color === color), position);
+      pool = pool.filter((item) => item.color !== color);
+      if (stitched.length === 0) continue;
+      blocks.push(...stitched);
+      const last = stitched[stitched.length - 1].stitches;
+      const [x, y] = last[last.length - 1];
       position = { x, y };
-      color = item.color;
     }
   }
   return blocks;
