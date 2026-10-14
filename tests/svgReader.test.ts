@@ -310,6 +310,32 @@ test("readSvg: handles negative viewBox origins with meet", () => {
   expect(block[0]).toStrictEqual([0, 125, C.STITCH]);
 });
 
+test("readSvg: expands symbols referenced by use", () => {
+  const pattern = readSvg(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+       <defs>
+         <symbol id="line" viewBox="0 0 10 10">
+           <path d="M0 0L10 0"/>
+         </symbol>
+       </defs>
+       <use href="#line" x="20" y="30" stroke="black"/>
+     </svg>`,
+    { size: 50, runningStitchLength: 1000 }
+  ).pattern;
+  const block = blocks(pattern)[0][0];
+  expect(block[0]).toStrictEqual([100, 150, C.STITCH]);
+  expect(block[block.length - 1]).toStrictEqual([150, 150, C.STITCH]);
+});
+
+test("readSvg: skips symbols that no use references", () => {
+  const { pattern } = readSvg(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+       <symbol id="line"><path d="M0 0L10 0" stroke="black"/></symbol>
+     </svg>`,
+  );
+  expect(pattern.stitches).toHaveLength(0);
+});
+
 test("readSvg: does not loop on cyclic use references", () => {
   const normalized = normalizeSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">

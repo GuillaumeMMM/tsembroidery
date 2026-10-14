@@ -45,7 +45,7 @@ const SHAPE_TAGS = new Set([
   "circle",
   "ellipse",
 ]);
-const CONTAINER_TAGS = new Set(["g", "svg", "a"]);
+const CONTAINER_TAGS = new Set(["g", "svg", "a", "symbol"]);
 const IGNORED_TAGS = new Set([
   "defs",
   "style",
@@ -394,7 +394,7 @@ function collectShapes(
     useDepth: number,
     visiting: Set<Element>,
   ): void => {
-    if (IGNORED_TAGS.has(tag) || tag === "symbol") return;
+    if (IGNORED_TAGS.has(tag) || (tag === "symbol" && useDepth === 0)) return;
 
     if (tag === "use") {
       if (useDepth >= maxDepth) {
