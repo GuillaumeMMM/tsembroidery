@@ -48,7 +48,7 @@ export function unite(a: Ring[], b: Ring[]): Ring[] {
 }
 
 export function subtract(region: Ring[], cut: Ring[]): Ring[] {
-  if (cut.length === 0 || region.length === 0) return region;
+  if (region.length === 0) return region;
   return clean(differenceD(region, cut, FillRule.NonZero, PRECISION));
 }
 
@@ -120,7 +120,7 @@ export function strokeOutline(
 
 /** The parts of each line outside `region`. */
 export function clipLines(lines: FlatPathSubpath[], region: Ring[]): FlatPathSubpath[] {
-  return region.length === 0 ? lines : splitLines(lines, region, ClipType.Difference);
+  return splitLines(lines, region, ClipType.Difference);
 }
 
 /** The parts of each line inside `region`. */

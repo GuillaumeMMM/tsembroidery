@@ -110,6 +110,58 @@ function clipRegion(shape: SvgShape, tolerance: number): Ring[] | null {
   return region;
 }
 
+interface Box {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+interface Cover {
+  rings: Ring[];
+  box: Box;
+}
+
+function bounds(points: Point2[]): Box {
+  const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+  for (const { x, y } of points) {
+    box.minX = Math.min(box.minX, x);
+    box.minY = Math.min(box.minY, y);
+    box.maxX = Math.max(box.maxX, x);
+    box.maxY = Math.max(box.maxY, y);
+  }
+  return box;
+}
+
+const MARGIN = 1;
+
+function overlaps(a: Box, b: Box): boolean {
+  return (
+    a.minX <= b.maxX + MARGIN &&
+    b.minX <= a.maxX + MARGIN &&
+    a.minY <= b.maxY + MARGIN &&
+    b.minY <= a.maxY + MARGIN
+  );
+}
+
+function covering(covers: Cover[], points: Point2[]): Ring[] {
+  if (points.length === 0) return [];
+  const box = bounds(points);
+  return covers.filter((cover) => overlaps(cover.box, box)).flatMap((cover) => cover.rings);
+}
+
+function uncovered(covers: Cover[], region: Ring[]): Ring[] {
+  return covers.length === 0 ? region : subtract(region, covering(covers, region.flat()));
+}
+
+function addCover(covers: Cover[], region: Ring[]): Cover[] {
+  if (region.length === 0) return covers;
+  const box = bounds(region.flat());
+  const touching = covers.filter((cover) => overlaps(cover.box, box));
+  const rings = unite(touching.flatMap((cover) => cover.rings), region);
+  return [...covers.filter((cover) => !touching.includes(cover)), { rings, box: bounds(rings.flat()) }];
+}
+
 /** Removes what clip paths and later shapes hide, as SVG paints them. Returns items in document order. */
 function visibleItems(
   shapes: SvgShape[],
@@ -117,7 +169,7 @@ function visibleItems(
   tolerance: number,
 ): Item<EmbThread>[] {
   const items: Item<EmbThread>[] = [];
-  let above: Ring[] = [];
+  let above: Cover[] = [];
   for (const shape of [...shapes].reverse()) {
     const clip = clipRegion(shape, tolerance);
     const clipped = (region: Ring[]) => (clip === null ? region : intersect(region, clip));
@@ -131,24 +183,24 @@ function visibleItems(
         width >= SATIN_MIN_WIDTH ? clipped(strokeOutline(fullLines, width, style.linecap, style.linejoin)) : [];
       if (width > SATIN_MAX_WIDTH) {
         // Too wide for satin: fill the area the stroke covers.
-        for (const island of islands(subtract(outline, above)).reverse()) {
+        for (const island of islands(uncovered(above, outline)).reverse()) {
           items.push(fillItem({ kind: "fill", rings: island }, style.color, settings));
         }
       } else {
-        for (const line of clipLines(lines, above).reverse()) {
+        for (const line of (above.length === 0 ? lines : clipLines(lines, covering(above, lines.flatMap((line) => line.points)))).reverse()) {
           items.push(partItem(linePart(line, width), style.color, settings));
         }
       }
       // Thin running lines have no area to hide anything.
-      above = unite(above, outline);
+      above = addCover(above, outline);
     }
     if (shape.fill !== null && shape.fill.style.color !== null) {
       const subpaths = flattenSvgPath(shape.fill.d, tolerance, shape.transform);
       const region = clipped(unionRings(subpaths.map((subpath) => subpath.points), shape.fill.style.rule));
-      for (const island of islands(subtract(region, above)).reverse()) {
+      for (const island of islands(uncovered(above, region)).reverse()) {
         items.push(fillItem({ kind: "fill", rings: island }, shape.fill.style.color, settings));
       }
-      above = unite(above, region);
+      above = addCover(above, region);
     }
   }
   return items.reverse();
