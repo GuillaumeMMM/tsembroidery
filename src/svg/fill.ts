@@ -131,17 +131,31 @@ function buildSections(rows: Segment[][]): Section[] {
   return sections;
 }
 
-function shortestPaths(
+interface Search {
+  distance: Float64Array;
+  previous: Int32Array;
+  seen: Int32Array;
+  round: number;
+}
+
+function closestTargets(
   graph: Graph,
   source: number,
-): { distance: Float64Array; previous: Int32Array } {
-  const distance = new Float64Array(graph.length).fill(Infinity);
-  const previous = new Int32Array(graph.length).fill(-1);
+  isTarget: (node: number) => boolean,
+  search: Search,
+): number[] {
+  const { distance, previous, seen } = search;
+  const round = (search.round += 1);
+  const at = (node: number) => (seen[node] === round ? distance[node] : Infinity);
   const heap: [number, number][] = [[0, source]];
+  seen[source] = round;
   distance[source] = 0;
+  previous[source] = -1;
   const swap = (i: number, j: number) =>
     ([heap[i], heap[j]] = [heap[j], heap[i]]);
-  while (heap.length > 0) {
+  const found: number[] = [];
+  let best = Infinity;
+  while (heap.length > 0 && heap[0][0] <= best) {
     const [cost, node] = heap[0];
     const last = heap.pop()!;
     if (heap.length > 0) {
@@ -157,10 +171,15 @@ function shortestPaths(
         i = m;
       }
     }
-    if (cost > distance[node]) continue;
+    if (cost > at(node)) continue;
+    if (isTarget(node)) {
+      best = cost;
+      found.push(node);
+    }
     for (const [next, weight] of graph[node]) {
       const candidate = cost + weight;
-      if (candidate >= distance[next]) continue;
+      if (candidate >= at(next)) continue;
+      seen[next] = round;
       distance[next] = candidate;
       previous[next] = node;
       heap.push([candidate, next]);
@@ -172,7 +191,7 @@ function shortestPaths(
       }
     }
   }
-  return { distance, previous };
+  return found;
 }
 
 /** Needle points along a row, on a staggered global grid so no lines form across rows. */
@@ -290,6 +309,21 @@ export function tatami(
       );
 
   const remaining = new Set(sections);
+  const entryOf = new Map<number, { section: Section; rank: number }[]>();
+  sections.forEach((section, index) => {
+    entries(section).forEach((crossing, position) => {
+      const list = entryOf.get(crossing.id) ?? [];
+      if (!list.some((known) => known.section === section)) list.push({ section, rank: index * 4 + position });
+      entryOf.set(crossing.id, list);
+    });
+  });
+  const search: Search = {
+    distance: new Float64Array(graph.length),
+    previous: new Int32Array(graph.length),
+    seen: new Int32Array(graph.length),
+    round: 0,
+  };
+  const isEntry = (node: number) => entryOf.get(node)?.some(({ section }) => remaining.has(section)) ?? false;
   let current: Crossing | null = null;
   while (remaining.size > 0) {
     // `out` starts at the needle's current position, which is already stitched.
@@ -303,20 +337,20 @@ export function tatami(
           ? [sections[0], sections[0][0].a]
           : nearestEntry(toRowSpace(from), sections);
     } else {
-      const { distance, previous } = shortestPaths(graph, current.id);
-      let best = Infinity;
+      const found = closestTargets(graph, current.id, isEntry, search);
       [section, entry] = [sections[0], sections[0][0].a];
-      for (const candidate of remaining) {
-        for (const crossing of entries(candidate)) {
-          const cost = distance[crossing.id];
-          if (cost < best) [best, section, entry] = [cost, candidate, crossing];
+      if (found.length > 0) {
+        let rank = Infinity;
+        for (const node of found) {
+          for (const candidate of entryOf.get(node)!) {
+            if (!remaining.has(candidate.section) || candidate.rank >= rank) continue;
+            [rank, section, entry] = [candidate.rank, candidate.section, nodes[node] as Crossing];
+          }
         }
-      }
-      if (Number.isFinite(best)) {
         const route: Point2[] = [];
-        for (let node = entry.id; node !== -1; node = previous[node])
-          route.unshift(nodes[node]);
-        appendLine(out, route, travelLength, rows.minLength);
+        for (let node = entry.id; node !== -1; node = search.previous[node])
+          route.push(nodes[node]);
+        appendLine(out, route.reverse(), travelLength, rows.minLength);
       } else {
         [section, entry] = nearestEntry(current, remaining);
         emit([entry], EmbConstant.JUMP);
