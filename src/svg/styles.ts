@@ -82,20 +82,28 @@ export function parseSvgColor(
   return thread;
 }
 
-function parsePaint(text: string, style: SvgStyleState): EmbThread | null {
+function parsePaint(
+  text: string,
+  style: SvgStyleState,
+  resolvePaint: (id: string) => EmbThread | null,
+): EmbThread | null {
   if (text.toLowerCase() === "currentcolor") return style.color;
   const reference = text.match(/^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)\s*(.*)$/i);
   if (reference === null) return parseSvgColor(text);
-  return parseSvgColor(reference[2]);
+  return resolvePaint(reference[1]) ?? parseSvgColor(reference[2]);
 }
 
-function applyProperty(style: SvgStyleState, [name, text]: Declaration): void {
+function applyProperty(
+  style: SvgStyleState,
+  [name, text]: Declaration,
+  resolvePaint: (id: string) => EmbThread | null,
+): void {
   const keyword = text.toLowerCase();
   if (keyword === "inherit") return;
   switch (name) {
     case "stroke":
     case "fill":
-      style[name] = parsePaint(text, style);
+      style[name] = parsePaint(text, style, resolvePaint);
       break;
     case "color":
       style.color = parseSvgColor(text) ?? style.color;
@@ -176,10 +184,11 @@ export function applySvgStyle(
   tag: string,
   inherited: SvgStyleState,
   cssRules: CssRule[],
+  resolvePaint: (id: string) => EmbThread | null,
 ): SvgStyleState {
   const style = { ...inherited };
   for (const declaration of cascade(element, tag, cssRules)) {
-    applyProperty(style, declaration);
+    applyProperty(style, declaration, resolvePaint);
   }
   return style;
 }

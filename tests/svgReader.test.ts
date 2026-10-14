@@ -327,6 +327,17 @@ test("readSvg: expands symbols referenced by use", () => {
   expect(block[block.length - 1]).toStrictEqual([150, 150, C.STITCH]);
 });
 
+test("readSvg: accepts use references surrounded by whitespace", () => {
+  const { pattern, warnings } = readSvg(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+       <defs><path id="line" d="M0 0L10 0"/></defs>
+       <use href=" #line " stroke="black"/>
+     </svg>`,
+  );
+  expect(warnings).toStrictEqual([]);
+  expect(blocks(pattern)).toHaveLength(1);
+});
+
 test("readSvg: skips symbols that no use references", () => {
   const { pattern } = readSvg(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
@@ -580,6 +591,27 @@ const fillColors = (source: string) =>
   normalizeSvg(source).shapes.map(
     (shape) => shape.fill?.style.color?.hexColor() ?? null,
   );
+
+test("readSvg: flattens gradients to the average of their stops", () => {
+  expect(
+    fillColors(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+         <style>.end { stop-color: #0000ff }</style>
+         <defs>
+           <linearGradient id="g">
+             <stop offset="0" stop-color="#ff0000"/>
+             <stop offset="1" class="end"/>
+           </linearGradient>
+           <radialGradient id="linked" href="#g"/>
+         </defs>
+         <rect width="5" height="5" fill="url(#g)"/>
+         <rect width="5" height="5" style="fill: url('#linked')"/>
+         <rect width="5" height="5" fill="url(#missing) green"/>
+         <rect width="5" height="5" fill="url(#missing)"/>
+       </svg>`
+    )
+  ).toStrictEqual(["#800080", "#800080", "#008000", null]);
+});
 
 test("readSvg: applies <style> classes as exported by Illustrator", () => {
   expect(

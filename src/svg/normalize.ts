@@ -22,6 +22,7 @@ import {
   getDefaultSvgStyle,
   getFillStyle,
   getStrokeStyle,
+  parseSvgColor,
   type SvgStyleState,
 } from "./styles.js";
 import type {
@@ -46,6 +47,7 @@ const SHAPE_TAGS = new Set([
   "ellipse",
 ]);
 const CONTAINER_TAGS = new Set(["g", "svg", "a", "symbol"]);
+const GRADIENT_TAGS = new Set(["lineargradient", "radialgradient"]);
 const IGNORED_TAGS = new Set([
   "defs",
   "style",
@@ -216,9 +218,9 @@ function averageColor(threads: EmbThread[]): EmbThread | null {
 
 function getHref(element: Element): string | null {
   return (
-    element.getAttribute("href") ||
-    element.getAttribute("xlink:href") ||
-    element.getAttributeNS(XLINK_NAMESPACE, "href") ||
+    element.getAttribute("href")?.trim() ||
+    element.getAttribute("xlink:href")?.trim() ||
+    element.getAttributeNS(XLINK_NAMESPACE, "href")?.trim() ||
     null
   );
 }
@@ -242,6 +244,46 @@ function collectShapes(
     .map((element) => element.textContent ?? "")
     .join("\n");
   const cssRules = parseStylesheet(styleSheet, warnings);
+
+  const gradients = new Map<string, EmbThread | null>();
+  const gradientColor = (
+    id: string,
+    seen = new Set<string>(),
+  ): EmbThread | null => {
+    if (gradients.has(id)) return gradients.get(id)!;
+    const element = elementsMap.get(id);
+    if (
+      element === undefined ||
+      !GRADIENT_TAGS.has(localName(element)) ||
+      seen.has(id)
+    ) {
+      warnings.push(`Unsupported paint url(#${id})`);
+      gradients.set(id, null);
+      return null;
+    }
+    const stops = childElements(element).filter(
+      (child) => localName(child) === "stop",
+    );
+    let color: EmbThread | null;
+    if (stops.length > 0) {
+      color = averageColor(
+        stops
+          .map(
+            (stop) =>
+              declaredValue(stop, "stop", cssRules, "stop-color") ?? "black",
+          )
+          .map(parseSvgColor)
+          .filter((thread) => thread !== null),
+      );
+    } else {
+      const href = getHref(element);
+      color = href?.startsWith("#")
+        ? gradientColor(href.slice(1), seen.add(id))
+        : null;
+    }
+    gradients.set(id, color);
+    return color;
+  };
 
   const threads: EmbThread[] = [];
 
@@ -366,7 +408,7 @@ function collectShapes(
       return;
     }
     const tag = localName(element);
-    const style = applySvgStyle(element, tag, inheritedStyle, cssRules);
+    const style = applySvgStyle(element, tag, inheritedStyle, cssRules, gradientColor);
 
     if (!style.display || !style.visibility || style.opacity <= 0) return;
 
