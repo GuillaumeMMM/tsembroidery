@@ -144,22 +144,64 @@ function overlaps(a: Box, b: Box): boolean {
   );
 }
 
-function covering(covers: Cover[], points: Point2[]): Ring[] {
+const CELL = 100;
+const MAX_CELLS = 1024;
+
+interface Covers {
+  list: Cover[];
+  cells: Map<string, number[]>;
+  wide: number[];
+}
+
+function cellRange(box: Box): [number, number, number, number] {
+  return [
+    Math.floor((box.minX - MARGIN) / CELL),
+    Math.floor((box.minY - MARGIN) / CELL),
+    Math.floor((box.maxX + MARGIN) / CELL),
+    Math.floor((box.maxY + MARGIN) / CELL),
+  ];
+}
+
+function covering(covers: Covers, points: Point2[]): Ring[] {
   if (points.length === 0) return [];
   const box = bounds(points);
-  return covers.filter((cover) => overlaps(cover.box, box)).flatMap((cover) => cover.rings);
+  const [x0, y0, x1, y1] = cellRange(box);
+  const found = new Set<number>(covers.wide);
+  if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS) covers.list.forEach((_, index) => found.add(index));
+  else {
+    for (let x = x0; x <= x1; x += 1) {
+      for (let y = y0; y <= y1; y += 1) {
+        for (const index of covers.cells.get(`${x},${y}`) ?? []) found.add(index);
+      }
+    }
+  }
+  return [...found]
+    .sort((a, b) => a - b)
+    .filter((index) => overlaps(covers.list[index].box, box))
+    .flatMap((index) => covers.list[index].rings);
 }
 
-function uncovered(covers: Cover[], region: Ring[]): Ring[] {
-  return covers.length === 0 ? region : subtract(region, covering(covers, region.flat()));
+function uncovered(covers: Covers, region: Ring[]): Ring[] {
+  return covers.list.length === 0 ? region : subtract(region, covering(covers, region.flat()));
 }
 
-function addCover(covers: Cover[], region: Ring[]): Cover[] {
-  if (region.length === 0) return covers;
+function addCover(covers: Covers, region: Ring[]): void {
+  if (region.length === 0) return;
   const box = bounds(region.flat());
-  const touching = covers.filter((cover) => overlaps(cover.box, box));
-  const rings = unite(touching.flatMap((cover) => cover.rings), region);
-  return [...covers.filter((cover) => !touching.includes(cover)), { rings, box: bounds(rings.flat()) }];
+  const index = covers.list.push({ rings: region, box }) - 1;
+  const [x0, y0, x1, y1] = cellRange(box);
+  if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS) {
+    covers.wide.push(index);
+    return;
+  }
+  for (let x = x0; x <= x1; x += 1) {
+    for (let y = y0; y <= y1; y += 1) {
+      const key = `${x},${y}`;
+      const cell = covers.cells.get(key);
+      if (cell === undefined) covers.cells.set(key, [index]);
+      else cell.push(index);
+    }
+  }
 }
 
 /** Removes what clip paths and later shapes hide, as SVG paints them. Returns items in document order. */
@@ -169,7 +211,7 @@ function visibleItems(
   tolerance: number,
 ): Item<EmbThread>[] {
   const items: Item<EmbThread>[] = [];
-  let above: Cover[] = [];
+  const above: Covers = { list: [], cells: new Map(), wide: [] };
   for (const shape of [...shapes].reverse()) {
     const clip = clipRegion(shape, tolerance);
     const clipped = (region: Ring[]) => (clip === null ? region : intersect(region, clip));
@@ -187,12 +229,12 @@ function visibleItems(
           items.push(fillItem({ kind: "fill", rings: island }, style.color, settings));
         }
       } else {
-        for (const line of (above.length === 0 ? lines : clipLines(lines, covering(above, lines.flatMap((line) => line.points)))).reverse()) {
+        for (const line of (above.list.length === 0 ? lines : clipLines(lines, covering(above, lines.flatMap((line) => line.points)))).reverse()) {
           items.push(partItem(linePart(line, width), style.color, settings));
         }
       }
       // Thin running lines have no area to hide anything.
-      above = addCover(above, outline);
+      addCover(above, outline);
     }
     if (shape.fill !== null && shape.fill.style.color !== null) {
       const subpaths = flattenSvgPath(shape.fill.d, tolerance, shape.transform);
@@ -200,21 +242,76 @@ function visibleItems(
       for (const island of islands(uncovered(above, region)).reverse()) {
         items.push(fillItem({ kind: "fill", rings: island }, shape.fill.style.color, settings));
       }
-      above = addCover(above, region);
+      addCover(above, region);
     }
   }
   return items.reverse();
 }
 
-function closest<C>(items: Item<C>[], from: Point2 | null): Item<C> {
-  return from === null
-    ? items[0]
-    : items.reduce((best, candidate) =>
-        distance(candidate.starts[nearest(candidate.starts, from)], from) <
-        distance(best.starts[nearest(best.starts, from)], from)
-          ? candidate
-          : best
-      );
+const GRID = 50;
+
+interface Finder<C> {
+  next(from: Point2 | null): Item<C>;
+  take(item: Item<C>): void;
+}
+
+function range(from: number, to: number): number[] {
+  return Array.from({ length: Math.max(0, to - from + 1) }, (_, index) => from + index);
+}
+
+function cellOf(point: Point2): [number, number] {
+  return [Math.floor(point.x / GRID), Math.floor(point.y / GRID)];
+}
+
+function nearestFinder<C>(items: Item<C>[]): Finder<C> {
+  const rank = new Map(items.map((item, index) => [item, index]));
+  const alive = new Set(items);
+  const cells = new Map<string, Item<C>[]>();
+  let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const item of items) {
+    for (const point of item.starts) {
+      const [cx, cy] = cellOf(point);
+      [x0, y0, x1, y1] = [Math.min(x0, cx), Math.min(y0, cy), Math.max(x1, cx), Math.max(y1, cy)];
+      const key = `${cx},${cy}`;
+      const cell = cells.get(key);
+      if (cell === undefined) cells.set(key, [item]);
+      else if (cell[cell.length - 1] !== item) cell.push(item);
+    }
+  }
+  return {
+    next(from) {
+      if (from === null) return items.find((item) => alive.has(item))!;
+      const [fx, fy] = cellOf(from);
+      const seen = new Set<Item<C>>();
+      let best: Item<C> | null = null;
+      let bestDistance = Infinity;
+      for (let r = 0; ; r += 1) {
+        if (best !== null && bestDistance < (r - 1) * GRID) break;
+        for (let cx = Math.max(fx - r, x0); cx <= Math.min(fx + r, x1); cx += 1) {
+          const edge = cx === fx - r || cx === fx + r;
+          const rows = edge ? range(Math.max(fy - r, y0), Math.min(fy + r, y1)) : [fy - r, fy + r].filter((cy) => cy >= y0 && cy <= y1);
+          for (const cy of rows) {
+            for (const item of cells.get(`${cx},${cy}`) ?? []) {
+              if (!alive.has(item) || seen.has(item)) continue;
+              seen.add(item);
+              const d = distance(item.starts[nearest(item.starts, from)], from);
+              if (d < bestDistance || (d === bestDistance && rank.get(item)! < rank.get(best!)!)) [best, bestDistance] = [item, d];
+            }
+          }
+        }
+        if (fx - r <= x0 && fx + r >= x1 && fy - r <= y0 && fy + r >= y1) break;
+      }
+      return best ?? items.find((item) => alive.has(item))!;
+    },
+    take(item) {
+      alive.delete(item);
+    },
+  };
+}
+
+function queueFinder<C>(queue: Item<C>[]): Finder<C> {
+  let index = 0;
+  return { next: () => queue[index++], take: () => {} };
 }
 
 interface Run<C> {
@@ -222,13 +319,12 @@ interface Run<C> {
   travel: number;
 }
 
-function stitchRun<C>(items: Item<C>[], start: Point2 | null, next: (pool: Item<C>[], from: Point2 | null) => Item<C>): Run<C> {
+function stitchRun<C>(items: Item<C>[], start: Point2 | null, finder: Finder<C>): Run<C> {
   const run: Run<C> = { blocks: [], travel: 0 };
-  const pool = [...items];
   let position = start;
-  while (pool.length > 0) {
-    const item = next(pool, position);
-    pool.splice(pool.indexOf(item), 1);
+  for (let left = items.length; left > 0; left -= 1) {
+    const item = finder.next(position);
+    finder.take(item);
     const stitches = item.stitch(position);
     if (stitches.length === 0) continue;
     if (position !== null) run.travel += distance(position, { x: stitches[0][0], y: stitches[0][1] });
@@ -239,7 +335,7 @@ function stitchRun<C>(items: Item<C>[], start: Point2 | null, next: (pool: Item<
   return run;
 }
 
-function shorten(points: Point2[], start: Point2 | null): number[] {
+function shortenAll(points: Point2[], start: Point2 | null): number[] {
   const order = points.map((_, index) => index);
   const at = (k: number) => (k < 0 ? start : k >= order.length ? null : points[order[k]]);
   const gap = (a: Point2 | null, b: Point2 | null) => (a === null || b === null ? 0 : distance(a, b));
@@ -257,8 +353,79 @@ function shorten(points: Point2[], start: Point2 | null): number[] {
   return order;
 }
 
+const EXACT_LIMIT = 3000;
+const NEIGHBORS = 10;
+
+function neighbors(points: Point2[]): number[][] {
+  const cells = new Map<string, number[]>();
+  points.forEach((point, index) => {
+    const key = cellOf(point).join(",");
+    const cell = cells.get(key);
+    if (cell === undefined) cells.set(key, [index]);
+    else cell.push(index);
+  });
+  return points.map((point, index) => {
+    const [fx, fy] = cellOf(point);
+    const found: [number, number][] = [];
+    for (let r = 0; found.length < points.length - 1; r += 1) {
+      for (let cx = fx - r; cx <= fx + r; cx += 1) {
+        const edge = cx === fx - r || cx === fx + r;
+        for (const cy of edge ? range(fy - r, fy + r) : [fy - r, fy + r]) {
+          for (const other of cells.get(`${cx},${cy}`) ?? []) {
+            if (other !== index) found.push([distance(point, points[other]), other]);
+          }
+        }
+      }
+      found.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      if (found.length >= NEIGHBORS && found[NEIGHBORS - 1][0] < r * GRID) break;
+    }
+    return found.slice(0, NEIGHBORS).map(([, other]) => other);
+  });
+}
+
+function shortenNear(points: Point2[], start: Point2 | null): number[] {
+  const order = points.map((_, index) => index);
+  const position = order.slice();
+  const near = neighbors(points);
+  const toStart =
+    start === null
+      ? []
+      : order
+          .slice()
+          .sort((a, b) => distance(points[a], start) - distance(points[b], start) || a - b)
+          .slice(0, NEIGHBORS);
+  const at = (k: number) => (k < 0 ? start : k >= order.length ? null : points[order[k]]);
+  const gap = (a: Point2 | null, b: Point2 | null) => (a === null || b === null ? 0 : distance(a, b));
+  const tryMove = (i: number, j: number): boolean => {
+    if (i >= j) return false;
+    const delta = gap(at(i - 1), at(j)) + gap(at(i), at(j + 1)) - gap(at(i - 1), at(i)) - gap(at(j), at(j + 1));
+    if (delta >= -1e-9) return false;
+    for (let a = i, b = j; a < b; a += 1, b -= 1) {
+      [order[a], order[b]] = [order[b], order[a]];
+      position[order[a]] = a;
+      position[order[b]] = b;
+    }
+    return true;
+  };
+  for (let improved = true; improved; ) {
+    improved = false;
+    for (const other of toStart) if (tryMove(0, position[other])) improved = true;
+    for (let p = 0; p < order.length; p += 1) {
+      for (const other of near[order[p]]) {
+        const q = position[other];
+        if (q > p + 1 ? tryMove(p + 1, q) : q < p - 1 && tryMove(q + 1, p)) improved = true;
+      }
+    }
+  }
+  return order;
+}
+
+function shorten(points: Point2[], start: Point2 | null): number[] {
+  return points.length <= EXACT_LIMIT ? shortenAll(points, start) : shortenNear(points, start);
+}
+
 function stitchColor<C>(items: Item<C>[], start: Point2 | null): PlannedBlock<C>[] {
-  const greedy = stitchRun(items, start, closest);
+  const greedy = stitchRun(items, start, nearestFinder(items));
   if (greedy.blocks.length < 3) return greedy.blocks;
   const middles = greedy.blocks.map(({ stitches }) => {
     const [first, last] = [stitches[0], stitches[stitches.length - 1]];
@@ -268,7 +435,7 @@ function stitchColor<C>(items: Item<C>[], start: Point2 | null): PlannedBlock<C>
   if (order.every((index, position) => index === position)) return greedy.blocks;
   const byPart = new Map(items.map((item) => [item.part, item]));
   const queue = order.map((index) => byPart.get(greedy.blocks[index].part)!);
-  const shorter = stitchRun(queue, start, () => queue.shift()!);
+  const shorter = stitchRun(queue, start, queueFinder(queue));
   return shorter.travel < greedy.travel ? shorter.blocks : greedy.blocks;
 }
 
@@ -281,9 +448,12 @@ function orderItems<C>(items: Item<C>[], start: Point2 | null): PlannedBlock<C>[
   let position: Point2 | null = start;
   for (const layer of [0, 1]) {
     let pool = items.filter((item) => item.layer === layer);
+    const finder = nearestFinder(pool);
     while (pool.length > 0) {
-      const { color } = closest(pool, position);
-      const stitched = stitchColor(pool.filter((item) => item.color === color), position);
+      const { color } = finder.next(position);
+      const group = pool.filter((item) => item.color === color);
+      group.forEach((item) => finder.take(item));
+      const stitched = stitchColor(group, position);
       pool = pool.filter((item) => item.color !== color);
       if (stitched.length === 0) continue;
       blocks.push(...stitched);

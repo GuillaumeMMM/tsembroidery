@@ -5,8 +5,8 @@ import { readSvg, type SvgReadSettings } from "./internal.ts";
 
 const settings: SvgReadSettings = { size: 100, colorTolerance: 9, minStitchLength: 0.3 };
 
-const read = (file: string) => {
-  const { pattern, warnings } = readSvg(readFileSync(`tests/fixtures/${file}`, "utf8"), settings);
+const read = (file: string, source = readFileSync(`tests/fixtures/${file}`, "utf8")) => {
+  const { pattern, warnings } = readSvg(source, settings);
   const blocks = [...pattern.getAsColorblocks()];
   return {
     threads: blocks.length,
@@ -26,3 +26,12 @@ test("readSvg: gallardo.svg keeps every layer filled with gradients", () => {
   expect({ threads, colors }).toStrictEqual({ threads: 114, colors: 106 });
   expect(warnings).toStrictEqual(["Skipped non-SVG element <namedview>"]);
 }, 60000);
+
+test("readSvg: reads thousands of stacked VTracer layers in seconds", () => {
+  const lines = readFileSync("tests/fixtures/DE1201_ORIG_01.svg", "utf8").split("\n");
+  const paths = lines.filter((line) => line.startsWith("<path")).slice(0, 2000);
+  const source = [...lines.slice(0, 3), ...paths, "</svg>"].join("\n");
+  const { threads, colors, warnings } = read("DE1201_ORIG_01.svg", source);
+  expect({ threads, colors }).toStrictEqual({ threads: 673, colors: 673 });
+  expect(warnings).toStrictEqual([]);
+}, 20000);
